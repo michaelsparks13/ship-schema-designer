@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ship Database Schema Designer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        .dragging { opacity: 0.5; }
+        .drag-over { background-color: rgb(219 234 254); border: 2px dashed rgb(59 130 246); }
+        .drag-over-column { background-color: rgb(254 226 226); border: 2px dashed rgb(239 68 68); }
+        .table-card { min-height: 200px; }
+        .column-item { cursor: grab; }
+        .column-item:active { cursor: grabbing; }
+        .modal-backdrop { background-color: rgba(0,0,0,0.5); }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fill-pct-bar {
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .fill-pct-bar-inner {
+            height: 100%;
+            border-radius: 2px;
+        }
+        .schema-table {
+            transition: all 0.2s ease;
+        }
+        .schema-table:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .field-item {
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .field-item:hover {
+            background-color: rgb(243 244 246);
+        }
+        .field-item.selected {
+            background-color: rgb(219 234 254);
+            border-color: rgb(59 130 246);
+        }
+        .source-column-highlight {
+            animation: pulse-highlight 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-highlight {
+            0%, 100% { background-color: rgb(254 249 195); }
+            50% { background-color: rgb(253 224 71); }
+        }
+        .connector-line {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const TABLE_COLORS = ['blue', 'green', 'purple', 'orange', 'pink', 'teal', 'indigo', 'red', 'yellow', 'cyan'];
+
+        // Schema definition from database_restructuring_plan.md
+        const NEW_SCHEMA = {
+            vessels: {
+                name: 'vessels',
+                displayName: 'Vessels (Core)',
+                color: 'blue',
+                type: 'core',
+                description: 'Central table with 191K vessel records',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'imo_number', type: 'VARCHAR(20)', sources: ['IMO Number'] },
+                    { name: 'mmsi', type: 'VARCHAR(15)', sources: ['MMSI'] },
+                    { name: 'call_sign', type: 'VARCHAR(20)', sources: ['Call Sign'] },
+                    { name: 'national_registration_number', type: 'VARCHAR(50)', sources: ['National Registration Number'] },
+                    { name: 'external_marking', type: 'VARCHAR(100)', sources: ['External Marking'] },
+                    { name: 'vessel_name', type: 'VARCHAR(255)', sources: ['Vessel Name'] },
+                    { name: 'vessel_name_local', type: 'VARCHAR(255)', sources: ['Vessel Name in local language'] },
+                    { name: 'previous_name', type: 'TEXT', sources: ['Previous Name'] },
+                    { name: 'flag', type: 'VARCHAR(100)', sources: ['Flag'] },
+                    { name: 'port_of_registry', type: 'VARCHAR(255)', sources: ['Port of Registry'] },
+                    { name: 'owner_name', type: 'VARCHAR(255)', sources: ['Owner Name'] },
+                    { name: 'owner_address', type: 'TEXT', sources: ['Owner Address'] },
+                    { name: 'operator_name', type: 'VARCHAR(255)', sources: ['Operator Name'] },
+                    { name: 'operator_address', type: 'TEXT', sources: ['Operator Address'] },
+                    { name: 'gear_type', type: 'VARCHAR(255)', sources: ['Gear'] },
+                    { name: 'width_meters', type: 'DECIMAL(8,2)', sources: ['Width (m)'] },
+                    { name: 'length_meters', type: 'DECIMAL(8,2)', sources: ['Length (m)'] },
+                    { name: 'gross_tonnage', type: 'DECIMAL(10,2)', sources: ['Gross Tonnage'] },
+                    { name: 'number_of_crew', type: 'INTEGER', sources: ['Number of Crew'] },
+                    { name: 'ship_status', type: 'VARCHAR(100)', sources: ['Ship Status'] },
+                    { name: 'ship_status_effective_date', type: 'DATE', sources: ['Ship Status Effective Date'] },
+                    { name: 'iuu_combined_list_link', type: 'TEXT', sources: ['IUU Combined List Vessel Link'] },
+                    { name: 'iuu_combined_list', type: 'BOOLEAN', sources: ['IUU Combined List'] },
+                    { name: 'scraper_notes', type: 'TEXT', sources: ['Scraper Notes'] },
+                    { name: 'sea_shepherd_arrest_info', type: 'TEXT', sources: ['Sea Shepherd Arrest Info'] },
+                ]
+            },
+            authorizing_bodies: {
+                name: 'authorizing_bodies',
+                displayName: 'Authorizing Bodies (Lookup)',
+                color: 'green',
+                type: 'lookup',
+                description: '14 records: RFMOs + EU + FAO + Friend of the Sea',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'code', type: 'VARCHAR(20)', sources: [] },
+                    { name: 'full_name', type: 'VARCHAR(255)', sources: [] },
+                    { name: 'body_type', type: 'VARCHAR(50)', sources: [] },
+                    { name: 'website_url', type: 'TEXT', sources: [] },
+                ]
+            },
+            vessel_authorizations: {
+                name: 'vessel_authorizations',
+                displayName: 'Vessel Authorizations (Junction)',
+                color: 'teal',
+                type: 'junction',
+                description: 'Replaces 68 RFMO/EU/FAO columns',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'authorizing_body_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'authorization_number', type: 'VARCHAR(100)', sources: [
+                        'Authorization Number for The Southeast Atlantic Fisheries Organization',
+                        'Authorization Number for The Northeast Atlantic Fisheries Commission',
+                        'Authorization Number for The Inter-American Tropical Tuna Commission',
+                        'Authorization Number for The Northwest Atlantic Fisheries Organization',
+                        'Authorization Number for The Indian Ocean Tuna Commission',
+                        'Authorization Number for The Western and Central Pacific Fisheries Commission',
+                        'Authorization Number for The North Pacific Fisheries Commission',
+                        'Authorization Number for the South Pacific Regional Fisheries Management Organisation',
+                        'Authorization Number for The International Commission for the Conservation of Atlantic Tunas',
+                        'Authorization Number for The Commission for the Conservation of Antarctic Marine Living Resources',
+                        'Authorization Number for The General Fisheries Commission for the Mediterranean'
+                    ]},
+                    { name: 'authorization_start_date', type: 'DATE', sources: [
+                        'Authorization Start Date for The Southeast Atlantic Fisheries Organization',
+                        'Authorization Start Date for The Northeast Atlantic Fisheries Commission',
+                        'Authorization Start Date for The Inter-American Tropical Tuna Commission',
+                        'Authorization Start Date for The Northwest Atlantic Fisheries Organization',
+                        'Authorization Start Date for The Indian Ocean Tuna Commission',
+                        'Authorization Start Date for The Western and Central Pacific Fisheries Commission',
+                        'Authorization Start Date for The North Pacific Fisheries Commission',
+                        'Authorization Start Date for the South Pacific Regional Fisheries Management Organisation',
+                        'Authorization Start Date for The International Commission for the Conservation of Atlantic Tunas',
+                        'Authorization Start Date for The Commission for the Conservation of Antarctic Marine Living Resources',
+                        'Authorization Start Date for The General Fisheries Commission for the Mediterranean'
+                    ]},
+                    { name: 'authorization_end_date', type: 'DATE', sources: [
+                        'Authorization End Date for The Southeast Atlantic Fisheries Organization',
+                        'Authorization End Date for The Northeast Atlantic Fisheries Commission',
+                        'Authorization End Date for The Inter-American Tropical Tuna Commission',
+                        'Authorization End Date for The Northwest Atlantic Fisheries Organization',
+                        'Authorization End Date for The Indian Ocean Tuna Commission',
+                        'Authorization End Date for The Western and Central Pacific Fisheries Commission',
+                        'Authorization End Date for The North Pacific Fisheries Commission',
+                        'Authorization End Date for the South Pacific Regional Fisheries Management Organisation',
+                        'Authorization End Date for The International Commission for the Conservation of Atlantic Tunas',
+                        'Authorization End Date for The Commission for the Conservation of Antarctic Marine Living Resources',
+                        'Authorization End Date for The General Fisheries Commission for the Mediterranean'
+                    ]},
+                    { name: 'authorization_link', type: 'TEXT', sources: [
+                        'Vessel Authorization Link for The Southeast Atlantic Fisheries Organization',
+                        'Vessel Authorization Link for The Northeast Atlantic Fisheries Commission',
+                        'Vessel Authorization Link for The Inter-American Tropical Tuna Commission',
+                        'Vessel Authorization Link for The Northwest Atlantic Fisheries Organization',
+                        'Vessel Authorization Link for The Indian Ocean Tuna Commission',
+                        'Vessel Authorization Link for The Western and Central Pacific Fisheries Commission',
+                        'Vessel Authorization Link for The North Pacific Fisheries Commission',
+                        'Vessel Authorization Link for the South Pacific Regional Fisheries Management Organisation',
+                        'Vessel Authorization Link for The International Commission for the Conservation of Atlantic Tunas',
+                        'Vessel Authorization Link for The Commission for the Conservation of Antarctic Marine Living Resources',
+                        'Vessel Authorization Link for The General Fisheries Commission for the Mediterranean',
+                        'FAO Global Record Link',
+                        'Registered with EU'
+                    ]},
+                    { name: 'is_registered', type: 'BOOLEAN', sources: ['Registered with EU'] },
+                    { name: 'source_info_last_updated', type: 'DATE', sources: [
+                        'Date Source Info Last Updated The for Northeast Atlantic Fisheries Commission',
+                        'Date Source Info Last Updated for The Commission for the Conservation of Antarctic Marine Living Resources',
+                        'Date Source Info Last Updated for The Inter-American Tropical Tuna Commission',
+                        'Date Source Info Last Updated for The International Commission for the Conservation of Atlantic Tunas',
+                        'Date Source Info Last Updated for The North Pacific Fisheries Commission',
+                        'Date Source Info Last Updated for The Northwest Atlantic Fisheries Organization',
+                        'Date Source Info Last Updated for The Southeast Atlantic Fisheries Organization',
+                        'Date Source Info Last Updated for the South Pacific Regional Fisheries Management Organisation'
+                    ]},
+                    { name: 'source_info_acquired', type: 'DATE', sources: [
+                        'Date Source Info Acquired for The Commission for the Conservation of Antarctic Marine Living Resources',
+                        'Date Source Info Acquired for The Inter-American Tropical Tuna Commission',
+                        'Date Source Info Acquired for The International Commission for the Conservation of Atlantic Tunas',
+                        'Date Source Info Acquired for The North Pacific Fisheries Commission',
+                        'Date Source Info Acquired for The Northwest Atlantic Fisheries Organization',
+                        'Date Source Info Acquired for The Southeast Atlantic Fisheries Organization',
+                        'Date Source Info Acquired for the South Pacific Regional Fisheries Management Organisation'
+                    ]},
+                ]
+            },
+            identity_sources: {
+                name: 'identity_sources',
+                displayName: 'Identity Sources (Lookup)',
+                color: 'purple',
+                type: 'lookup',
+                description: '4 records: MagicPort, GFW, IHS, etc.',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'code', type: 'VARCHAR(20)', sources: [] },
+                    { name: 'full_name', type: 'VARCHAR(255)', sources: [] },
+                    { name: 'description', type: 'TEXT', sources: [] },
+                ]
+            },
+            vessel_identity_confirmations: {
+                name: 'vessel_identity_confirmations',
+                displayName: 'Vessel Identity Confirmations (Junction)',
+                color: 'indigo',
+                type: 'junction',
+                description: 'Tracks which sources confirmed vessel identity',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'identity_source_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'is_confirmed', type: 'BOOLEAN', sources: [
+                        'Listed in MagicPort 23Feb2025',
+                        'Identity Confirmed by Global Fishing Watch',
+                        'From Global Fishing Watch Data',
+                        'IHS Markit Data'
+                    ]},
+                    { name: 'confirmation_date', type: 'DATE', sources: [] },
+                    { name: 'source_data', type: 'JSONB', sources: [] },
+                    { name: 'notes', type: 'TEXT', sources: [] },
+                ]
+            },
+            iuu_organizations: {
+                name: 'iuu_organizations',
+                displayName: 'IUU Organizations (Lookup)',
+                color: 'red',
+                type: 'lookup',
+                description: '13 organizations that maintain IUU lists',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'code', type: 'VARCHAR(20)', sources: [] },
+                    { name: 'full_name', type: 'VARCHAR(255)', sources: [] },
+                ]
+            },
+            vessel_iuu_listings: {
+                name: 'vessel_iuu_listings',
+                displayName: 'Vessel IUU Listings (Junction)',
+                color: 'orange',
+                type: 'junction',
+                description: 'Replaces 24 IUU columns (12 orgs x 2 fields)',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'organization_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'listing_date', type: 'DATE', sources: [
+                        'Indian Ocean Tuna Commission IUU Listing Date',
+                        'International Commission for the Conservation of Atlantic Tunas IUU Listing Date',
+                        'Inter-American Tropical Tuna Commission IUU Listing Date',
+                        'Commission for the Conservation of Antarctic Marine Living Resources IUU Listing Date',
+                        'Western and Central Pacific Fisheries Commission IUU Listing Date',
+                        'Southeast Atlantic Fisheries Organization IUU Listing Date',
+                        'Northeast Atlantic Fisheries Commission IUU Listing Date',
+                        'Northwest Atlantic Fisheries Organization IUU Listing Date',
+                        'Commission for the Conservation of Southern Bluefin Tuna IUU Listing Date',
+                        'General Fisheries Commission of the Mediterranean IUU Listing Date',
+                        'North Pacific Fisheries Commission IUU Listing Date',
+                        'Southern Indian Ocean Fisheries Agreement IUU Listing Date'
+                    ]},
+                    { name: 'listing_reason', type: 'TEXT', sources: [
+                        'Indian Ocean Tuna Commission IUU Listing Reason',
+                        'International Commission for the Conservation of Atlantic Tunas IUU Listing Reason',
+                        'Inter-American Tropical Tuna Commission IUU Listing Reason',
+                        'Commission for the Conservation of Antarctic Marine Living Resources IUU Listing Reason',
+                        'Western and Central Pacific Fisheries Commission IUU Listing Reason',
+                        'Southeast Atlantic Fisheries Organization IUU Listing Reason',
+                        'Northeast Atlantic Fisheries Commission IUU Listing Reason',
+                        'Northwest Atlantic Fisheries Organization IUU Listing Reason',
+                        'Commission for the Conservation of Southern Bluefin Tuna IUU Listing Reason',
+                        'General Fisheries Commission of the Mediterranean IUU Listing Reason',
+                        'North Pacific Fisheries Commission IUU Listing Reason',
+                        'Southern Indian Ocean Fisheries Agreement IUU Listing Reason'
+                    ]},
+                    { name: 'delisting_date', type: 'DATE', sources: [] },
+                    { name: 'is_currently_listed', type: 'BOOLEAN', sources: [] },
+                ]
+            },
+            countries: {
+                name: 'countries',
+                displayName: 'Countries (Lookup)',
+                color: 'cyan',
+                type: 'lookup',
+                description: '15 countries with fishing vessel registries',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'code', type: 'VARCHAR(10)', sources: [] },
+                    { name: 'name', type: 'VARCHAR(255)', sources: [] },
+                    { name: 'region', type: 'VARCHAR(100)', sources: [] },
+                ]
+            },
+            vessel_country_registrations: {
+                name: 'vessel_country_registrations',
+                displayName: 'Vessel Country Registrations (Junction)',
+                color: 'yellow',
+                type: 'junction',
+                description: 'Replaces ~50 country-specific columns',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'country_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'is_registered', type: 'BOOLEAN', sources: [] },
+                    { name: 'fishing_license_number', type: 'VARCHAR(100)', sources: [
+                        'PERU_License Number',
+                        'THAI_License Number',
+                        'INDONESIA_Fishing License Number'
+                    ]},
+                    { name: 'license_valid_from', type: 'DATE', sources: [] },
+                    { name: 'license_valid_until', type: 'DATE', sources: [
+                        'PERU_Fishing Permit Expiration Date',
+                        'THAI_Certificater Expiration Date'
+                    ]},
+                    { name: 'fishing_permit_status', type: 'VARCHAR(100)', sources: [
+                        'PERU_Fishing Permit Status',
+                        'THAI_Permit Availability'
+                    ]},
+                    { name: 'taxpayer_id', type: 'VARCHAR(100)', sources: ['PERU_Taxpayer ID'] },
+                    { name: 'additional_data', type: 'JSONB', sources: [] },
+                ]
+            },
+            fmfo_countries: {
+                name: 'fmfo_countries',
+                displayName: 'FMFO Countries (Lookup)',
+                color: 'pink',
+                type: 'lookup',
+                description: '11 countries for FMFO monitoring lists',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'code', type: 'VARCHAR(10)', sources: [] },
+                    { name: 'name', type: 'VARCHAR(255)', sources: [] },
+                ]
+            },
+            vessel_fmfo_listings: {
+                name: 'vessel_fmfo_listings',
+                displayName: 'Vessel FMFO Listings (Junction)',
+                color: 'green',
+                type: 'junction',
+                description: 'Replaces 11 FMFO boolean columns',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'fmfo_country_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'is_listed', type: 'BOOLEAN', sources: [
+                        'Senegal Country List 2025',
+                        'Peru FMFO list',
+                        'India FMFO list',
+                        'Ecuador FMFO list',
+                        'Gambia FMFO list',
+                        'Thai FMFO list',
+                        'Turkey FMFO list',
+                        'Morocco FMFO list',
+                        'Morocco FMFO List',
+                        'Indonesia FMFO List',
+                        'Vietnam FMFO List',
+                        'Philippines FMFO List'
+                    ]},
+                    { name: 'listing_year', type: 'INTEGER', sources: [] },
+                    { name: 'notes', type: 'TEXT', sources: [] },
+                ]
+            },
+            friend_of_sea_certifications: {
+                name: 'friend_of_sea_certifications',
+                displayName: 'Friend of the Sea Certifications',
+                color: 'blue',
+                type: 'supporting',
+                description: 'FOS certification data',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'registration_number', type: 'VARCHAR(100)', sources: ['Friend of the Sea Registration Number'] },
+                    { name: 'certified_company', type: 'VARCHAR(255)', sources: ['Company authorized to sell the Friend of the Sea certified products'] },
+                    { name: 'fao_fishing_area', type: 'VARCHAR(255)', sources: ['FAO fishing area per Friend of the Sea'] },
+                    { name: 'targeted_species', type: 'TEXT', sources: ['Targeted species per Friend of the Sea'] },
+                    { name: 'certificate_status', type: 'VARCHAR(50)', sources: ['Friend of the Sea Certificate Status'] },
+                ]
+            },
+            vessel_name_history: {
+                name: 'vessel_name_history',
+                displayName: 'Vessel Name History',
+                color: 'gray',
+                type: 'supporting',
+                description: 'Historical vessel names for compliance',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'previous_name', type: 'VARCHAR(255)', sources: ['Previous Name'] },
+                    { name: 'name_from_date', type: 'DATE', sources: [] },
+                    { name: 'name_to_date', type: 'DATE', sources: [] },
+                    { name: 'source', type: 'VARCHAR(255)', sources: [] },
+                ]
+            },
+            vessel_arrests: {
+                name: 'vessel_arrests',
+                displayName: 'Vessel Arrests',
+                color: 'red',
+                type: 'supporting',
+                description: 'Enforcement arrest records',
+                fields: [
+                    { name: 'id', type: 'INTEGER (PK)', sources: [] },
+                    { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+                    { name: 'arrest_date', type: 'DATE', sources: [] },
+                    { name: 'arresting_authority', type: 'VARCHAR(255)', sources: [] },
+                    { name: 'arrest_location', type: 'VARCHAR(255)', sources: [] },
+                    { name: 'arrest_reason', type: 'TEXT', sources: ['Sea Shepherd Arrest Info'] },
+                ]
+            }
+        };
+
+        // Empty columns to highlight for deletion
+        const EMPTY_COLUMNS = [
+            'Authorization Number for The Northwest Atlantic Fisheries Organization',
+            'Authorization Number for The Southeast Atlantic Fisheries Organization',
+            'Authorization Start Date for The General Fisheries Commission for the Mediterranean',
+            'Authorization Start Date for The Inter-American Tropical Tuna Commission',
+            'Authorization Start Date for The International Commission for the Conservation of Atlantic Tunas',
+            'Authorization Start Date for The North Pacific Fisheries Commission',
+            'Authorization Start Date for The Northwest Atlantic Fisheries Organization',
+            'Authorization Start Date for The Southeast Atlantic Fisheries Organization',
+            'Authorization End Date for The General Fisheries Commission for the Mediterranean',
+            'Authorization End Date for The Inter-American Tropical Tuna Commission',
+            'Authorization End Date for The International Commission for the Conservation of Atlantic Tunas',
+            'Authorization End Date for The North Pacific Fisheries Commission',
+            'Authorization End Date for The Northwest Atlantic Fisheries Organization',
+            'Authorization End Date for The Southeast Atlantic Fisheries Organization',
+            'Vessel Authorization Link for The General Fisheries Commission for the Mediterranean',
+            'Vessel Authorization Link for The International Commission for the Conservation of Atlantic Tunas',
+            'Vessel Authorization Link for The North Pacific Fisheries Commission',
+            'Vessel Authorization Link for The Northwest Atlantic Fisheries Organization',
+            'Vessel Authorization Link for The Southeast Atlantic Fisheries Organization',
+            'Date Source Info Last Updated The for Northeast Atlantic Fisheries Commission',
+            'Date Source Info Last Updated for The Commission for the Conservation of Antarctic Marine Living Resources',
+            'Date Source Info Last Updated for The Inter-American Tropical Tuna Commission',
+            'Date Source Info Last Updated for The International Commission for the Conservation of Atlantic Tunas',
+            'Date Source Info Last Updated for The North Pacific Fisheries Commission',
+            'Date Source Info Last Updated for The Northwest Atlantic Fisheries Organization',
+            'Date Source Info Last Updated for The Southeast Atlantic Fisheries Organization',
+            'Date Source Info Last Updated for the South Pacific Regional Fisheries Management Organisation',
+            'Date Source Info Acquired for The Commission for the Conservation of Antarctic Marine Living Resources',
+            'Date Source Info Acquired for The Inter-American Tropical Tuna Commission',
+            'Date Source Info Acquired for The International Commission for the Conservation of Atlantic Tunas',
+            'Date Source Info Acquired for The North Pacific Fisheries Commission',
+            'Date Source Info Acquired for The Northwest Atlantic Fisheries Organization',
+            'Date Source Info Acquired for The Southeast Atlantic Fisheries Organization',
+            'Date Source Info Acquired for the South Pacific Regional Fisheries Management Organisation',
+            'South Pacific Regional Fisheries Management Organization IUU Listing Date',
+            'South Pacific Regional Fisheries Management Organization IUU Listing Reason',
+            'ARGENTINA_approved_catch_species',
+            'THAI_Certificater Expiration Date',
+            'THAI_Certifying Unit',
+            'THAI_Registered with Rayong Marine 2024-2026'
+        ];
+
+        function App() {
+            const [viewMode, setViewMode] = useState('schema'); // 'schema' or 'designer'
+            const [tables, setTables] = useState({
+                'source_data': {
+                    name: 'Source Data (Original)',
+                    color: 'gray',
+                    columns: []
+                }
+            });
+            const [sampleData, setSampleData] = useState([]);
+            const [allColumns, setAllColumns] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [loadingStatus, setLoadingStatus] = useState('Loading sample data...');
+            const [loadError, setLoadError] = useState(null);
+
+            // Stats from full dataset
+            const [columnStats, setColumnStats] = useState({}); // { colName: { fillPct, uniqueValues: [] } }
+            const [totalRows, setTotalRows] = useState(0);
+
+            const [draggedColumn, setDraggedColumn] = useState(null);
+            const [dragSourceTable, setDragSourceTable] = useState(null);
+            const [dropTargetColumn, setDropTargetColumn] = useState(null);
+            const [selectedColumn, setSelectedColumn] = useState(null);
+            const [selectedTable, setSelectedTable] = useState(null);
+            const [showRenameModal, setShowRenameModal] = useState(false);
+            const [showValueModal, setShowValueModal] = useState(false);
+            const [showNewTableModal, setShowNewTableModal] = useState(false);
+            const [showPreviewModal, setShowPreviewModal] = useState(false);
+            const [showCombineModal, setShowCombineModal] = useState(false);
+            const [columnRenames, setColumnRenames] = useState({});
+            const [valueReplacements, setValueReplacements] = useState({});
+            const [columnCombinations, setColumnCombinations] = useState({});
+            const [newTableName, setNewTableName] = useState('');
+            const [renameValue, setRenameValue] = useState('');
+            const [previewTable, setPreviewTable] = useState(null);
+            const [combineTargetColumn, setCombineTargetColumn] = useState(null);
+            const [combineNewName, setCombineNewName] = useState('');
+            const [searchFilter, setSearchFilter] = useState('');
+            const [previewPage, setPreviewPage] = useState(0);
+            const PREVIEW_PAGE_SIZE = 50;
+
+            // Schema view state
+            const [selectedNewField, setSelectedNewField] = useState(null);
+            const [selectedNewTable, setSelectedNewTable] = useState(null);
+            const [highlightedSourceColumns, setHighlightedSourceColumns] = useState([]);
+            const [showFieldMappingModal, setShowFieldMappingModal] = useState(false);
+
+            // Load CSV data on mount
+            useEffect(() => {
+                loadCSVData();
+            }, []);
+
+            const loadCSVData = async () => {
+                setLoading(true);
+                setLoadError(null);
+                setLoadingStatus('Loading sample data for preview...');
+
+                try {
+                    // First load sample data for preview (500 rows)
+                    const sampleResults = await new Promise((resolve, reject) => {
+                        Papa.parse('sample_data.csv', {
+                            download: true,
+                            header: true,
+                            skipEmptyLines: true,
+                            complete: resolve,
+                            error: reject
+                        });
+                    });
+
+                    const columns = sampleResults.meta.fields || [];
+                    const filteredColumns = columns.filter(c => c && c.trim() && c !== 'Unnamed: 0');
+
+                    setAllColumns(filteredColumns);
+                    setSampleData(sampleResults.data);
+                    setTables({
+                        'source_data': {
+                            name: 'Source Data (Original)',
+                            color: 'gray',
+                            columns: filteredColumns
+                        }
+                    });
+
+                    setLoadingStatus('Loading full dataset for statistics...');
+
+                    // Now load full dataset for statistics
+                    const stats = {};
+                    let rowCount = 0;
+
+                    // Initialize stats for each column
+                    filteredColumns.forEach(col => {
+                        stats[col] = {
+                            nonEmptyCount: 0,
+                            uniqueValues: new Set()
+                        };
+                    });
+
+                    await new Promise((resolve, reject) => {
+                        Papa.parse('full_data.csv', {
+                            download: true,
+                            header: true,
+                            skipEmptyLines: true,
+                            step: (row) => {
+                                rowCount++;
+                                filteredColumns.forEach(col => {
+                                    const val = row.data[col];
+                                    if (val && val.trim()) {
+                                        stats[col].nonEmptyCount++;
+                                        // Only keep first 100 unique values to save memory
+                                        if (stats[col].uniqueValues.size < 100) {
+                                            stats[col].uniqueValues.add(val.trim());
+                                        }
+                                    }
+                                });
+
+                                // Update status every 10000 rows
+                                if (rowCount % 10000 === 0) {
+                                    setLoadingStatus(`Processing row ${rowCount.toLocaleString()}...`);
+                                }
+                            },
+                            complete: resolve,
+                            error: reject
+                        });
+                    });
+
+                    // Convert stats to final format
+                    const finalStats = {};
+                    filteredColumns.forEach(col => {
+                        finalStats[col] = {
+                            fillPct: rowCount > 0 ? (stats[col].nonEmptyCount / rowCount * 100).toFixed(1) : 0,
+                            nonEmptyCount: stats[col].nonEmptyCount,
+                            uniqueValues: Array.from(stats[col].uniqueValues).sort()
+                        };
+                    });
+
+                    setColumnStats(finalStats);
+                    setTotalRows(rowCount);
+                    setLoading(false);
+
+                } catch (error) {
+                    console.error('Error loading CSV:', error);
+                    setLoadError('Failed to load CSV files. Make sure sample_data.csv and full_data.csv are in the same directory.');
+                    setLoading(false);
+                }
+            };
+
+            const getColorClasses = (color) => {
+                const colors = {
+                    gray: 'bg-gray-100 border-gray-300',
+                    blue: 'bg-blue-50 border-blue-300',
+                    green: 'bg-green-50 border-green-300',
+                    purple: 'bg-purple-50 border-purple-300',
+                    orange: 'bg-orange-50 border-orange-300',
+                    pink: 'bg-pink-50 border-pink-300',
+                    teal: 'bg-teal-50 border-teal-300',
+                    indigo: 'bg-indigo-50 border-indigo-300',
+                    red: 'bg-red-50 border-red-300',
+                    yellow: 'bg-yellow-50 border-yellow-300',
+                    cyan: 'bg-cyan-50 border-cyan-300'
+                };
+                return colors[color] || colors.gray;
+            };
+
+            const getHeaderColorClasses = (color) => {
+                const colors = {
+                    gray: 'bg-gray-200 text-gray-800',
+                    blue: 'bg-blue-200 text-blue-800',
+                    green: 'bg-green-200 text-green-800',
+                    purple: 'bg-purple-200 text-purple-800',
+                    orange: 'bg-orange-200 text-orange-800',
+                    pink: 'bg-pink-200 text-pink-800',
+                    teal: 'bg-teal-200 text-teal-800',
+                    indigo: 'bg-indigo-200 text-indigo-800',
+                    red: 'bg-red-200 text-red-800',
+                    yellow: 'bg-yellow-200 text-yellow-800',
+                    cyan: 'bg-cyan-200 text-cyan-800'
+                };
+                return colors[color] || colors.gray;
+            };
+
+            const getFillBarColor = (pct) => {
+                const p = parseFloat(pct);
+                if (p >= 80) return 'bg-green-500';
+                if (p >= 50) return 'bg-yellow-500';
+                if (p >= 20) return 'bg-orange-500';
+                return 'bg-red-500';
+            };
+
+            const handleDragStart = (e, column, tableId) => {
+                setDraggedColumn(column);
+                setDragSourceTable(tableId);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', column);
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            };
+
+            const handleDragEnter = (e) => {
+                e.currentTarget.classList.add('drag-over');
+            };
+
+            const handleDragLeave = (e) => {
+                e.currentTarget.classList.remove('drag-over');
+            };
+
+            const handleColumnDragEnter = (e, column, tableId) => {
+                e.stopPropagation();
+                if (draggedColumn && draggedColumn !== column && dragSourceTable === tableId) {
+                    setDropTargetColumn(column);
+                    e.currentTarget.classList.add('drag-over-column');
+                }
+            };
+
+            const handleColumnDragLeave = (e) => {
+                e.currentTarget.classList.remove('drag-over-column');
+                setDropTargetColumn(null);
+            };
+
+            const handleColumnDrop = (e, targetColumn, tableId) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.remove('drag-over-column');
+
+                if (!draggedColumn || draggedColumn === targetColumn) {
+                    setDropTargetColumn(null);
+                    return;
+                }
+
+                if (dragSourceTable === tableId) {
+                    setCombineTargetColumn(targetColumn);
+                    setCombineNewName('');
+                    setShowCombineModal(true);
+                }
+
+                setDropTargetColumn(null);
+            };
+
+            const handleDrop = (e, targetTableId) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+
+                if (!draggedColumn || dragSourceTable === targetTableId) return;
+
+                setTables(prev => {
+                    const newTables = { ...prev };
+
+                    const columnsToMove = columnCombinations[draggedColumn]
+                        ? [draggedColumn, ...columnCombinations[draggedColumn]]
+                        : [draggedColumn];
+
+                    newTables[dragSourceTable] = {
+                        ...newTables[dragSourceTable],
+                        columns: newTables[dragSourceTable].columns.filter(c => !columnsToMove.includes(c))
+                    };
+
+                    newTables[targetTableId] = {
+                        ...newTables[targetTableId],
+                        columns: [...newTables[targetTableId].columns, draggedColumn]
+                    };
+
+                    return newTables;
+                });
+
+                setDraggedColumn(null);
+                setDragSourceTable(null);
+            };
+
+            const handleDragEnd = () => {
+                setDraggedColumn(null);
+                setDragSourceTable(null);
+                setDropTargetColumn(null);
+            };
+
+            const combineColumns = () => {
+                if (!combineNewName.trim() || !draggedColumn || !combineTargetColumn) return;
+
+                const newColName = combineNewName.trim();
+
+                const sourceCols1 = columnCombinations[draggedColumn]
+                    ? [draggedColumn, ...columnCombinations[draggedColumn]]
+                    : [draggedColumn];
+                const sourceCols2 = columnCombinations[combineTargetColumn]
+                    ? [combineTargetColumn, ...columnCombinations[combineTargetColumn]]
+                    : [combineTargetColumn];
+
+                const allSourceCols = [...new Set([...sourceCols1, ...sourceCols2])];
+
+                setColumnCombinations(prev => {
+                    const newCombinations = { ...prev };
+                    delete newCombinations[draggedColumn];
+                    delete newCombinations[combineTargetColumn];
+                    newCombinations[newColName] = allSourceCols;
+                    return newCombinations;
+                });
+
+                // Combine stats for the new column
+                setColumnStats(prev => {
+                    const newStats = { ...prev };
+                    const combinedUniqueValues = new Set();
+                    let maxFillPct = 0;
+
+                    allSourceCols.forEach(col => {
+                        if (prev[col]) {
+                            prev[col].uniqueValues.forEach(v => combinedUniqueValues.add(v));
+                            maxFillPct = Math.max(maxFillPct, parseFloat(prev[col].fillPct) || 0);
+                        }
+                    });
+
+                    newStats[newColName] = {
+                        fillPct: maxFillPct.toFixed(1),
+                        uniqueValues: Array.from(combinedUniqueValues).sort().slice(0, 100)
+                    };
+
+                    return newStats;
+                });
+
+                setTables(prev => {
+                    const newTables = { ...prev };
+                    Object.keys(newTables).forEach(tableId => {
+                        const cols = newTables[tableId].columns;
+                        const hasCol1 = cols.includes(draggedColumn);
+                        const hasCol2 = cols.includes(combineTargetColumn);
+
+                        if (hasCol1 || hasCol2) {
+                            const firstIdx = Math.min(
+                                hasCol1 ? cols.indexOf(draggedColumn) : Infinity,
+                                hasCol2 ? cols.indexOf(combineTargetColumn) : Infinity
+                            );
+                            const filtered = cols.filter(c => c !== draggedColumn && c !== combineTargetColumn);
+                            filtered.splice(firstIdx, 0, newColName);
+                            newTables[tableId] = {
+                                ...newTables[tableId],
+                                columns: filtered
+                            };
+                        }
+                    });
+                    return newTables;
+                });
+
+                setShowCombineModal(false);
+                setDraggedColumn(null);
+                setCombineTargetColumn(null);
+                setCombineNewName('');
+            };
+
+            const createNewTable = () => {
+                if (!newTableName.trim()) return;
+
+                const tableId = newTableName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                const usedColors = Object.values(tables).map(t => t.color);
+                const availableColor = TABLE_COLORS.find(c => !usedColors.includes(c)) || 'blue';
+
+                setTables(prev => ({
+                    ...prev,
+                    [tableId]: {
+                        name: newTableName,
+                        color: availableColor,
+                        columns: []
+                    }
+                }));
+
+                setNewTableName('');
+                setShowNewTableModal(false);
+            };
+
+            const deleteTable = (tableId) => {
+                if (tableId === 'source_data') return;
+
+                setTables(prev => {
+                    const newTables = { ...prev };
+                    newTables.source_data = {
+                        ...newTables.source_data,
+                        columns: [...newTables.source_data.columns, ...newTables[tableId].columns]
+                    };
+                    delete newTables[tableId];
+                    return newTables;
+                });
+            };
+
+            const openRenameModal = (column, tableId) => {
+                setSelectedColumn(column);
+                setSelectedTable(tableId);
+                setRenameValue(columnRenames[column] || column);
+                setShowRenameModal(true);
+            };
+
+            const saveRename = () => {
+                if (renameValue.trim() && renameValue !== selectedColumn) {
+                    setColumnRenames(prev => ({
+                        ...prev,
+                        [selectedColumn]: renameValue.trim()
+                    }));
+                }
+                setShowRenameModal(false);
+            };
+
+            const openValueModal = (column, tableId) => {
+                setSelectedColumn(column);
+                setSelectedTable(tableId);
+                setShowValueModal(true);
+            };
+
+            const getUniqueValues = (column) => {
+                // For combined columns, merge unique values from all source columns
+                const sourceCols = columnCombinations[column] || [column];
+                const allValues = new Set();
+
+                sourceCols.forEach(col => {
+                    if (columnStats[col] && columnStats[col].uniqueValues) {
+                        columnStats[col].uniqueValues.forEach(v => allValues.add(v));
+                    }
+                });
+
+                // Also check if we have stats for the combined column itself
+                if (columnStats[column] && columnStats[column].uniqueValues) {
+                    columnStats[column].uniqueValues.forEach(v => allValues.add(v));
+                }
+
+                return Array.from(allValues).sort().slice(0, 100);
+            };
+
+            const addValueReplacement = (column, oldValue, newValue) => {
+                setValueReplacements(prev => ({
+                    ...prev,
+                    [column]: {
+                        ...(prev[column] || {}),
+                        [oldValue]: newValue
+                    }
+                }));
+            };
+
+            const getDisplayName = (column) => {
+                return columnRenames[column] || column;
+            };
+
+            const getDisplayValue = (column, row) => {
+                const sourceCols = columnCombinations[column] || [column];
+                let value = '';
+                for (const col of sourceCols) {
+                    if (row[col] && row[col].trim()) {
+                        value = row[col];
+                        break;
+                    }
+                }
+
+                if (valueReplacements[column] && valueReplacements[column][value]) {
+                    return valueReplacements[column][value];
+                }
+                return value;
+            };
+
+            const openPreview = (tableId) => {
+                setPreviewTable(tableId);
+                setPreviewPage(0);
+                setShowPreviewModal(true);
+            };
+
+            const exportSchema = () => {
+                const schema = {
+                    tables: Object.entries(tables).filter(([id]) => id !== 'source_data').map(([id, table]) => ({
+                        id,
+                        name: table.name,
+                        columns: table.columns.map(col => ({
+                            original: col,
+                            renamed: columnRenames[col] || col,
+                            sourceColumns: columnCombinations[col] || [col],
+                            valueReplacements: valueReplacements[col] || {}
+                        }))
+                    })),
+                    columnRenames,
+                    valueReplacements,
+                    columnCombinations
+                };
+
+                const blob = new Blob([JSON.stringify(schema, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'schema-design.json';
+                a.click();
+            };
+
+            const resetSchema = () => {
+                setTables({
+                    'source_data': {
+                        name: 'Source Data (Original)',
+                        color: 'gray',
+                        columns: [...allColumns]
+                    }
+                });
+                setColumnRenames({});
+                setValueReplacements({});
+                setColumnCombinations({});
+            };
+
+            const getFilteredColumns = (columns) => {
+                if (!searchFilter.trim()) return columns;
+                const filter = searchFilter.toLowerCase();
+                return columns.filter(col => {
+                    const displayName = getDisplayName(col).toLowerCase();
+                    const originalName = col.toLowerCase();
+                    return displayName.includes(filter) || originalName.includes(filter);
+                });
+            };
+
+            const getColumnFillPct = (column) => {
+                // For combined columns, take the max fill percentage
+                const sourceCols = columnCombinations[column] || [column];
+                let maxPct = 0;
+                sourceCols.forEach(col => {
+                    if (columnStats[col]) {
+                        maxPct = Math.max(maxPct, parseFloat(columnStats[col].fillPct) || 0);
+                    }
+                });
+                // Also check direct stats for the column
+                if (columnStats[column]) {
+                    maxPct = Math.max(maxPct, parseFloat(columnStats[column].fillPct) || 0);
+                }
+                return maxPct.toFixed(1);
+            };
+
+            // Schema view handlers
+            const handleFieldClick = (tableName, field) => {
+                if (field.sources && field.sources.length > 0) {
+                    setSelectedNewTable(tableName);
+                    setSelectedNewField(field);
+                    setHighlightedSourceColumns(field.sources);
+                    setShowFieldMappingModal(true);
+                }
+            };
+
+            const getTypeColor = (type) => {
+                switch(type) {
+                    case 'core': return 'border-blue-500';
+                    case 'lookup': return 'border-green-500';
+                    case 'junction': return 'border-purple-500';
+                    case 'supporting': return 'border-orange-500';
+                    default: return 'border-gray-500';
+                }
+            };
+
+            const getTypeBadgeColor = (type) => {
+                switch(type) {
+                    case 'core': return 'bg-blue-100 text-blue-800';
+                    case 'lookup': return 'bg-green-100 text-green-800';
+                    case 'junction': return 'bg-purple-100 text-purple-800';
+                    case 'supporting': return 'bg-orange-100 text-orange-800';
+                    default: return 'bg-gray-100 text-gray-800';
+                }
+            };
+
+            // Calculate total source columns replaced
+            const getTotalSourceColumnsReplaced = () => {
+                const allSources = new Set();
+                Object.values(NEW_SCHEMA).forEach(table => {
+                    table.fields.forEach(field => {
+                        field.sources.forEach(s => allSources.add(s));
+                    });
+                });
+                return allSources.size;
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="loading-spinner mx-auto mb-4"></div>
+                            <p className="text-gray-600">{loadingStatus}</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (loadError) {
+                return (
+                    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
+                            <div className="text-red-500 text-5xl mb-4">!</div>
+                            <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Data</h2>
+                            <p className="text-gray-600 mb-4">{loadError}</p>
+                            <button
+                                onClick={loadCSVData}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    {/* Header */}
+                    <header className="bg-white shadow-sm border-b sticky top-0 z-40">
+                        <div className="max-w-full mx-auto px-4 py-4">
+                            <div className="flex justify-between items-center flex-wrap gap-4">
+                                <div>
+                                    <h1 className="text-2xl font-bold text-gray-900">Ship Database Schema Designer</h1>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        {allColumns.length} columns | {totalRows.toLocaleString()} total rows | {sampleData.length} preview rows
+                                    </p>
+                                </div>
+                                <div className="flex gap-2 flex-wrap items-center">
+                                    {/* View Toggle */}
+                                    <div className="flex bg-gray-200 rounded-lg p-1 mr-4">
+                                        <button
+                                            onClick={() => setViewMode('schema')}
+                                            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                                                viewMode === 'schema'
+                                                    ? 'bg-white shadow text-gray-900'
+                                                    : 'text-gray-600 hover:text-gray-900'
+                                            }`}
+                                        >
+                                            Schema Comparison
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode('designer')}
+                                            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                                                viewMode === 'designer'
+                                                    ? 'bg-white shadow text-gray-900'
+                                                    : 'text-gray-600 hover:text-gray-900'
+                                            }`}
+                                        >
+                                            Column Designer
+                                        </button>
+                                    </div>
+
+                                    {viewMode === 'designer' && (
+                                        <>
+                                            <button
+                                                onClick={resetSchema}
+                                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition text-sm"
+                                            >
+                                                Reset
+                                            </button>
+                                            <button
+                                                onClick={() => setShowNewTableModal(true)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+                                            >
+                                                + New Table
+                                            </button>
+                                            <button
+                                                onClick={exportSchema}
+                                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+                                            >
+                                                Export Schema
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {viewMode === 'schema' ? (
+                        /* Schema Comparison View */
+                        <div className="max-w-full mx-auto px-4 py-6">
+                            {/* Summary Stats */}
+                            <div className="bg-white rounded-lg shadow p-6 mb-6">
+                                <h2 className="text-xl font-bold mb-4">Schema Transformation Summary</h2>
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                    <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                                        <div className="text-3xl font-bold text-red-600">{allColumns.length}</div>
+                                        <div className="text-sm text-red-700">Current Columns</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                                        <div className="text-3xl font-bold text-green-600">{Object.keys(NEW_SCHEMA).length}</div>
+                                        <div className="text-sm text-green-700">New Tables</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                        <div className="text-3xl font-bold text-blue-600">
+                                            {Object.values(NEW_SCHEMA).reduce((sum, t) => sum + t.fields.length, 0)}
+                                        </div>
+                                        <div className="text-sm text-blue-700">New Fields</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                                        <div className="text-3xl font-bold text-yellow-600">{EMPTY_COLUMNS.length}</div>
+                                        <div className="text-sm text-yellow-700">Empty (Delete)</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+                                        <div className="text-3xl font-bold text-purple-600">51%</div>
+                                        <div className="text-sm text-purple-700">Reduction</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Legend */}
+                            <div className="bg-white rounded-lg shadow p-4 mb-6">
+                                <h3 className="font-semibold mb-3">Table Types</h3>
+                                <div className="flex flex-wrap gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded border-2 border-blue-500 bg-blue-50"></div>
+                                        <span className="text-sm">Core Table</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded border-2 border-green-500 bg-green-50"></div>
+                                        <span className="text-sm">Lookup Table</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50"></div>
+                                        <span className="text-sm">Junction Table</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded border-2 border-orange-500 bg-orange-50"></div>
+                                        <span className="text-sm">Supporting Table</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 ml-8">
+                                        <div className="w-4 h-4 rounded bg-blue-100"></div>
+                                        <span className="text-sm">Click field to see source columns</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* New Schema Tables */}
+                            <div className="mb-8">
+                                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    <span className="text-green-600">NEW</span> Relational Schema (14 Tables)
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {Object.entries(NEW_SCHEMA).map(([tableName, table]) => (
+                                        <div
+                                            key={tableName}
+                                            className={`schema-table bg-white rounded-lg shadow border-l-4 ${getTypeColor(table.type)}`}
+                                        >
+                                            <div className="p-4 border-b bg-gray-50">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="font-bold text-gray-900">{table.name}</h3>
+                                                    <span className={`text-xs px-2 py-1 rounded ${getTypeBadgeColor(table.type)}`}>
+                                                        {table.type}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">{table.description}</p>
+                                            </div>
+                                            <div className="p-2 max-h-[300px] overflow-y-auto">
+                                                {table.fields.map((field, idx) => {
+                                                    const hasMapping = field.sources && field.sources.length > 0;
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            onClick={() => hasMapping && handleFieldClick(tableName, field)}
+                                                            className={`field-item p-2 rounded text-sm border mb-1 ${
+                                                                hasMapping
+                                                                    ? 'cursor-pointer bg-blue-50 border-blue-200 hover:bg-blue-100'
+                                                                    : 'bg-gray-50 border-gray-200'
+                                                            }`}
+                                                        >
+                                                            <div className="flex justify-between items-start">
+                                                                <span className="font-medium text-gray-800">{field.name}</span>
+                                                                <span className="text-xs text-gray-500 ml-2">{field.type}</span>
+                                                            </div>
+                                                            {hasMapping && (
+                                                                <div className="text-xs text-blue-600 mt-1">
+                                                                    Replaces {field.sources.length} column{field.sources.length > 1 ? 's' : ''}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Current Structure - Collapsible */}
+                            <details className="bg-white rounded-lg shadow mb-6">
+                                <summary className="p-4 cursor-pointer font-bold text-lg flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <span className="text-red-600">CURRENT</span> Flat Structure ({allColumns.length} Columns)
+                                    </span>
+                                    <span className="text-sm font-normal text-gray-500">Click to expand</span>
+                                </summary>
+                                <div className="p-4 border-t">
+                                    <div className="mb-4">
+                                        <input
+                                            type="text"
+                                            placeholder="Search columns..."
+                                            value={searchFilter}
+                                            onChange={(e) => setSearchFilter(e.target.value)}
+                                            className="w-full max-w-md px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 max-h-[500px] overflow-y-auto">
+                                        {getFilteredColumns(allColumns).map(col => {
+                                            const isEmpty = EMPTY_COLUMNS.includes(col);
+                                            const isHighlighted = highlightedSourceColumns.includes(col);
+                                            const fillPct = columnStats[col]?.fillPct || 0;
+                                            return (
+                                                <div
+                                                    key={col}
+                                                    className={`p-2 rounded border text-xs ${
+                                                        isEmpty
+                                                            ? 'bg-red-50 border-red-300 text-red-700'
+                                                            : isHighlighted
+                                                                ? 'source-column-highlight border-yellow-400'
+                                                                : 'bg-white border-gray-200'
+                                                    }`}
+                                                    title={`${col}\nFill rate: ${fillPct}%${isEmpty ? '\n(EMPTY - will be deleted)' : ''}`}
+                                                >
+                                                    <div className="truncate font-medium">{col}</div>
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        <div className="fill-pct-bar flex-1">
+                                                            <div
+                                                                className={`fill-pct-bar-inner ${getFillBarColor(fillPct)}`}
+                                                                style={{ width: `${fillPct}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-gray-500">{fillPct}%</span>
+                                                    </div>
+                                                    {isEmpty && <div className="text-red-600 font-bold mt-1">EMPTY</div>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </details>
+
+                            {/* Empty Columns Section */}
+                            <details className="bg-white rounded-lg shadow">
+                                <summary className="p-4 cursor-pointer font-bold text-lg flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <span className="text-red-600">DELETE</span> Empty Columns ({EMPTY_COLUMNS.length})
+                                    </span>
+                                    <span className="text-sm font-normal text-gray-500">Click to expand</span>
+                                </summary>
+                                <div className="p-4 border-t">
+                                    <p className="text-gray-600 mb-4">
+                                        These {EMPTY_COLUMNS.length} columns contain zero values across all {totalRows.toLocaleString()} rows and should be removed:
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        {EMPTY_COLUMNS.map(col => (
+                                            <div key={col} className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                                                {col}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    ) : (
+                        /* Column Designer View (Original) */
+                        <>
+                            {/* Instructions */}
+                            <div className="max-w-full mx-auto px-4 py-4">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h3 className="font-semibold text-blue-800 mb-2">How to use:</h3>
+                                    <ul className="text-sm text-blue-700 space-y-1">
+                                        <li>1. <strong>Create tables</strong> using the "+ New Table" button</li>
+                                        <li>2. <strong>Drag columns</strong> from Source Data to your new tables</li>
+                                        <li>3. <strong>Combine columns</strong> by dropping one column onto another within the same table</li>
+                                        <li>4. <strong>Rename columns</strong> or <strong>replace values</strong> using the buttons on each column</li>
+                                        <li>5. <strong>Preview</strong> each table to see how the data will look</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Search Filter */}
+                            <div className="max-w-full mx-auto px-4 pb-4">
+                                <input
+                                    type="text"
+                                    placeholder="Search columns..."
+                                    value={searchFilter}
+                                    onChange={(e) => setSearchFilter(e.target.value)}
+                                    className="w-full max-w-md px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+
+                            {/* Tables Grid */}
+                            <div className="max-w-full mx-auto px-4 py-4">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+                                    {Object.entries(tables).map(([tableId, table]) => {
+                                        const filteredCols = getFilteredColumns(table.columns);
+                                        return (
+                                            <div
+                                                key={tableId}
+                                                className={`table-card rounded-lg border-2 ${getColorClasses(table.color)} shadow-sm`}
+                                                onDragOver={handleDragOver}
+                                                onDragEnter={handleDragEnter}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleDrop(e, tableId)}
+                                            >
+                                                {/* Table Header */}
+                                                <div className={`px-4 py-3 rounded-t-lg ${getHeaderColorClasses(table.color)} flex justify-between items-center`}>
+                                                    <div>
+                                                        <h3 className="font-bold">{table.name}</h3>
+                                                        <span className="text-xs opacity-75">
+                                                            {table.columns.length} columns
+                                                            {searchFilter && ` (${filteredCols.length} shown)`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => openPreview(tableId)}
+                                                            className="text-xs px-2 py-1 bg-white/50 rounded hover:bg-white/75 transition"
+                                                        >
+                                                            Preview
+                                                        </button>
+                                                        {tableId !== 'source_data' && (
+                                                            <button
+                                                                onClick={() => deleteTable(tableId)}
+                                                                className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Columns */}
+                                                <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
+                                                    {filteredCols.length === 0 ? (
+                                                        <div className="text-center py-8 text-gray-400 text-sm">
+                                                            {searchFilter ? 'No matching columns' : 'Drop columns here'}
+                                                        </div>
+                                                    ) : (
+                                                        filteredCols.map(column => {
+                                                            const fillPct = getColumnFillPct(column);
+                                                            return (
+                                                                <div
+                                                                    key={column}
+                                                                    draggable
+                                                                    onDragStart={(e) => handleDragStart(e, column, tableId)}
+                                                                    onDragEnd={handleDragEnd}
+                                                                    onDragEnter={(e) => handleColumnDragEnter(e, column, tableId)}
+                                                                    onDragLeave={handleColumnDragLeave}
+                                                                    onDragOver={(e) => e.preventDefault()}
+                                                                    onDrop={(e) => handleColumnDrop(e, column, tableId)}
+                                                                    className={`column-item p-2 bg-white rounded border shadow-sm hover:shadow transition ${
+                                                                        draggedColumn === column ? 'dragging' : ''
+                                                                    } ${dropTargetColumn === column ? 'drag-over-column' : ''}`}
+                                                                >
+                                                                    <div className="flex justify-between items-start gap-2">
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="text-sm font-medium text-gray-800 truncate" title={getDisplayName(column)}>
+                                                                                {getDisplayName(column)}
+                                                                            </div>
+                                                                            {columnRenames[column] && (
+                                                                                <div className="text-xs text-gray-400 truncate" title={column}>
+                                                                                    was: {column}
+                                                                                </div>
+                                                                            )}
+                                                                            {columnCombinations[column] && (
+                                                                                <div className="text-xs text-green-600">
+                                                                                    Combined: {columnCombinations[column].length} sources
+                                                                                </div>
+                                                                            )}
+                                                                            {valueReplacements[column] && Object.keys(valueReplacements[column]).length > 0 && (
+                                                                                <div className="text-xs text-purple-500">
+                                                                                    {Object.keys(valueReplacements[column]).length} replacements
+                                                                                </div>
+                                                                            )}
+                                                                            {/* Fill percentage bar */}
+                                                                            <div className="mt-1">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <div className="fill-pct-bar flex-1">
+                                                                                        <div
+                                                                                            className={`fill-pct-bar-inner ${getFillBarColor(fillPct)}`}
+                                                                                            style={{ width: `${fillPct}%` }}
+                                                                                        />
+                                                                                    </div>
+                                                                                    <span className="text-xs text-gray-500 w-12 text-right">{fillPct}%</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); openRenameModal(column, tableId); }}
+                                                                                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                                                            >
+                                                                                Rename
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); openValueModal(column, tableId); }}
+                                                                                className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                                                                            >
+                                                                                Values
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Stats Footer */}
+                            <div className="max-w-full mx-auto px-4 py-6">
+                                <div className="bg-white rounded-lg shadow p-4">
+                                    <h3 className="font-semibold mb-3">Schema Statistics</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        <div className="text-center p-3 bg-gray-50 rounded">
+                                            <div className="text-2xl font-bold text-gray-600">
+                                                {allColumns.length}
+                                            </div>
+                                            <div className="text-sm text-gray-500">Total Columns</div>
+                                        </div>
+                                        <div className="text-center p-3 bg-gray-50 rounded">
+                                            <div className="text-2xl font-bold text-blue-600">
+                                                {Object.keys(tables).filter(k => k !== 'source_data').length}
+                                            </div>
+                                            <div className="text-sm text-gray-500">New Tables</div>
+                                        </div>
+                                        <div className="text-center p-3 bg-gray-50 rounded">
+                                            <div className="text-2xl font-bold text-green-600">
+                                                {Object.entries(tables)
+                                                    .filter(([id]) => id !== 'source_data')
+                                                    .reduce((sum, [, t]) => sum + t.columns.length, 0)}
+                                            </div>
+                                            <div className="text-sm text-gray-500">Columns Assigned</div>
+                                        </div>
+                                        <div className="text-center p-3 bg-gray-50 rounded">
+                                            <div className="text-2xl font-bold text-purple-600">
+                                                {Object.keys(columnRenames).length}
+                                            </div>
+                                            <div className="text-sm text-gray-500">Columns Renamed</div>
+                                        </div>
+                                        <div className="text-center p-3 bg-gray-50 rounded">
+                                            <div className="text-2xl font-bold text-orange-600">
+                                                {Object.keys(columnCombinations).length}
+                                            </div>
+                                            <div className="text-sm text-gray-500">Columns Combined</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Field Mapping Modal */}
+                    {showFieldMappingModal && selectedNewField && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[700px] max-w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold">Field Mapping</h3>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            <span className="font-mono bg-blue-100 px-2 py-1 rounded">{selectedNewField.name}</span>
+                                            {' '}in{' '}
+                                            <span className="font-semibold">{NEW_SCHEMA[selectedNewTable]?.displayName}</span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setShowFieldMappingModal(false);
+                                            setHighlightedSourceColumns([]);
+                                        }}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="font-semibold text-blue-800">This field replaces {selectedNewField.sources.length} source column{selectedNewField.sources.length > 1 ? 's' : ''}</span>
+                                    </div>
+                                    <p className="text-sm text-blue-700">
+                                        Instead of having {selectedNewField.sources.length} separate columns in the flat structure,
+                                        this single field stores all values with the organization identified via a foreign key relationship.
+                                    </p>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto">
+                                    <h4 className="font-semibold mb-2 text-gray-700">Source Columns:</h4>
+                                    <div className="space-y-2">
+                                        {selectedNewField.sources.map((source, idx) => {
+                                            const stats = columnStats[source];
+                                            const isEmpty = EMPTY_COLUMNS.includes(source);
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`p-3 rounded border ${
+                                                        isEmpty
+                                                            ? 'bg-red-50 border-red-200'
+                                                            : 'bg-gray-50 border-gray-200'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <span className="text-sm font-medium">{source}</span>
+                                                        {isEmpty && (
+                                                            <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">EMPTY</span>
+                                                        )}
+                                                    </div>
+                                                    {stats && (
+                                                        <div className="mt-2 flex items-center gap-2">
+                                                            <div className="fill-pct-bar flex-1 max-w-[200px]">
+                                                                <div
+                                                                    className={`fill-pct-bar-inner ${getFillBarColor(stats.fillPct)}`}
+                                                                    style={{ width: `${stats.fillPct}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-gray-500">
+                                                                {stats.fillPct}% filled ({stats.nonEmptyCount?.toLocaleString() || 0} values)
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 pt-4 border-t flex justify-end">
+                                    <button
+                                        onClick={() => {
+                                            setShowFieldMappingModal(false);
+                                            setHighlightedSourceColumns([]);
+                                        }}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Rename Modal */}
+                    {showRenameModal && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-96 max-w-full mx-4">
+                                <h3 className="text-lg font-bold mb-4">Rename Column</h3>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Original name:
+                                    </label>
+                                    <div className="text-sm text-gray-500 bg-gray-50 p-2 rounded mb-3 break-all">
+                                        {selectedColumn}
+                                    </div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        New name:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={renameValue}
+                                        onChange={(e) => setRenameValue(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="New column name"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => setShowRenameModal(false)}
+                                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={saveRename}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Combine Columns Modal */}
+                    {showCombineModal && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-full mx-4">
+                                <h3 className="text-lg font-bold mb-4">Combine Columns</h3>
+                                <div className="mb-4">
+                                    <p className="text-sm text-gray-600 mb-3">
+                                        You are combining these columns into one. Values will be merged (first non-empty value wins).
+                                    </p>
+                                    <div className="bg-gray-50 p-3 rounded mb-3">
+                                        <div className="text-sm font-medium text-gray-700 mb-1">Source columns:</div>
+                                        <div className="text-sm text-gray-600 break-all">* {draggedColumn}</div>
+                                        <div className="text-sm text-gray-600 break-all">* {combineTargetColumn}</div>
+                                    </div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        New combined column name:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={combineNewName}
+                                        onChange={(e) => setCombineNewName(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                        placeholder="e.g., authorization_number"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setShowCombineModal(false);
+                                            setDraggedColumn(null);
+                                            setCombineTargetColumn(null);
+                                        }}
+                                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={combineColumns}
+                                        disabled={!combineNewName.trim()}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Combine
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Value Replacement Modal */}
+                    {showValueModal && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[700px] max-w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
+                                <h3 className="text-lg font-bold mb-2">Replace Values</h3>
+                                <p className="text-sm text-gray-500 mb-2 break-all">Column: {selectedColumn}</p>
+                                <p className="text-xs text-gray-400 mb-4">
+                                    Fill rate: {getColumnFillPct(selectedColumn)}% |
+                                    Showing up to 100 unique values from full dataset ({totalRows.toLocaleString()} rows)
+                                </p>
+
+                                <div className="flex-1 overflow-y-auto mb-4">
+                                    <div className="space-y-2">
+                                        {getUniqueValues(selectedColumn).map(value => (
+                                            <div key={value} className="flex items-center gap-2">
+                                                <span className="text-sm bg-gray-100 px-2 py-1 rounded flex-shrink-0 max-w-[250px] truncate" title={value}>
+                                                    {value}
+                                                </span>
+                                                <span className="text-gray-400">-></span>
+                                                <input
+                                                    type="text"
+                                                    defaultValue={valueReplacements[selectedColumn]?.[value] || value}
+                                                    onChange={(e) => addValueReplacement(selectedColumn, value, e.target.value)}
+                                                    className="flex-1 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                                />
+                                            </div>
+                                        ))}
+                                        {getUniqueValues(selectedColumn).length === 0 && (
+                                            <p className="text-gray-500 text-sm">No values found in dataset</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end border-t pt-4">
+                                    <button
+                                        onClick={() => setShowValueModal(false)}
+                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* New Table Modal */}
+                    {showNewTableModal && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-96 max-w-full mx-4">
+                                <h3 className="text-lg font-bold mb-4">Create New Table</h3>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Table Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newTableName}
+                                        onChange={(e) => setNewTableName(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="e.g., Vessels, Authorizations"
+                                        onKeyDown={(e) => e.key === 'Enter' && createNewTable()}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => setShowNewTableModal(false)}
+                                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={createNewTable}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    >
+                                        Create
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Preview Modal */}
+                    {showPreviewModal && previewTable && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[95vw] max-w-7xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold">
+                                            Preview: {tables[previewTable].name}
+                                        </h3>
+                                        <p className="text-sm text-gray-500">
+                                            {tables[previewTable].columns.length} columns |
+                                            Showing rows {previewPage * PREVIEW_PAGE_SIZE + 1} - {Math.min((previewPage + 1) * PREVIEW_PAGE_SIZE, sampleData.length)} of {sampleData.length} sample rows
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowPreviewModal(false)}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                {/* Pagination */}
+                                <div className="flex justify-center gap-2 mb-4">
+                                    <button
+                                        onClick={() => setPreviewPage(p => Math.max(0, p - 1))}
+                                        disabled={previewPage === 0}
+                                        className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="px-3 py-1">
+                                        Page {previewPage + 1} of {Math.ceil(sampleData.length / PREVIEW_PAGE_SIZE)}
+                                    </span>
+                                    <button
+                                        onClick={() => setPreviewPage(p => Math.min(Math.ceil(sampleData.length / PREVIEW_PAGE_SIZE) - 1, p + 1))}
+                                        disabled={(previewPage + 1) * PREVIEW_PAGE_SIZE >= sampleData.length}
+                                        className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+
+                                <div className="overflow-auto flex-1 border rounded">
+                                    {tables[previewTable].columns.length === 0 ? (
+                                        <p className="text-gray-500 text-center py-8">No columns in this table yet</p>
+                                    ) : (
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50 sticky top-0">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                                                    {tables[previewTable].columns.map(col => (
+                                                        <th key={col} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" title={col}>
+                                                            {getDisplayName(col)}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {sampleData
+                                                    .slice(previewPage * PREVIEW_PAGE_SIZE, (previewPage + 1) * PREVIEW_PAGE_SIZE)
+                                                    .map((row, idx) => (
+                                                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                        <td className="px-3 py-2 text-xs text-gray-400">
+                                                            {previewPage * PREVIEW_PAGE_SIZE + idx + 1}
+                                                        </td>
+                                                        {tables[previewTable].columns.map(col => (
+                                                            <td key={col} className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate" title={getDisplayValue(col, row)}>
+                                                                {getDisplayValue(col, row)}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 flex justify-end">
+                                    <button
+                                        onClick={() => setShowPreviewModal(false)}
+                                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
