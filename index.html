@@ -38,129 +38,128 @@
         const FIELD_EXAMPLES = {
             'id': '12345', 'imo_number': '9134270', 'mmsi': '412345678', 'call_sign': 'BQKV',
             'national_registration_number': 'PE-01234-CM', 'external_marking': 'INKA 201',
-            'vessel_name': 'HAI FENG 823', 'vessel_name_local': '海丰823',
+            'ship_name': 'HAI FENG 823', 'ship_name_local': '海丰823',
             'previous_name': 'LIAN RUN 22', 'flag': 'China', 'port_of_registry': 'Zhoushan',
             'owner_name': 'Zhejiang Ocean Family Co Ltd', 'owner_address': '88 Haitian Road, Zhoushan, Zhejiang',
             'operator_name': 'Pingtan Marine Enterprise', 'operator_address': '18 Pingtan Road, Fuzhou, Fujian',
-            'gear_type': 'Trawlers - Midwater', 'width_meters': '13.5', 'length_meters': '58.2',
+            'gear': 'Trawlers - Midwater', 'width_m': '13.5', 'length_m': '58.2',
             'gross_tonnage': '1,245', 'number_of_crew': '28', 'ship_status': 'Active',
-            'ship_status_effective_date': '2024-01-15', 'iuu_combined_list_link': 'https://iuu-vessels.org/vessel/12345',
-            'iuu_combined_list': 'true', 'scraper_notes': 'Vessel data updated from WCPFC registry 2024-03',
+            'ship_status_effective_date': '2024-01-15', 'iuu_combined_list_ship_link': 'https://iuu-vessels.org/ship/12345',
+            'iuu_combined_list': 'true', 'scraper_notes': 'Ship data updated from WCPFC registry 2024-03',
             'sea_shepherd_arrest_info': 'Detained in Liberia Aug 2019 for illegal transshipment',
             'code': 'WCPFC', 'full_name': 'Western and Central Pacific Fisheries Commission',
             'body_type': 'RFMO', 'website_url': 'https://www.wcpfc.int/',
-            'description': 'Primary source for vessel identity verification',
-            'vessel_id': '12345 (FK to vessels.id)', 'authorizing_body_id': '3 (FK to authorizing_bodies.id)',
+            'description': 'Primary source for ship identity verification',
+            'ship_id': '12345 (FK to ships.id)', 'authorizing_body_id': '3 (FK to authorizing_bodies.id)',
             'authorization_number': 'VR-2024-CHN-0892', 'authorization_start_date': '2024-01-01',
-            'authorization_end_date': '2024-12-31', 'authorization_link': 'https://wcpfc.int/vessel/VR-2024-CHN-0892',
-            'is_registered': 'true', 'source_info_last_updated': '2024-03-15', 'source_info_acquired': '2024-02-01',
-            'identity_source_id': '2 (FK to identity_sources.id)', 'is_confirmed': 'true',
-            'confirmation_date': '2024-01-20',
-            'source_data': '{"gfw_vessel_id": "CHN-FV-8823", "confidence_score": 0.95, "last_ais_position": {"lat": -12.45, "lon": -77.12}, "matched_fields": ["imo", "mmsi", "call_sign"]}',
+            'authorization_end_date': '2024-12-31', 'ship_authorization_link': 'https://wcpfc.int/ship/VR-2024-CHN-0892',
+            'registered_with_eu': 'true', 'date_source_info_last_updated': '2024-03-15', 'date_source_info_acquired': '2024-02-01',
+            'identity_source_id': '2 (FK to identity_sources.id)', 'identity_confirmed_by_gfw': 'true',
+            'listed_in_magicport': 'true', 'confirmation_date': '2024-01-20',
+            'source_data': '{"gfw_ship_id": "CHN-FV-8823", "confidence_score": 0.95, "last_ais_position": {"lat": -12.45, "lon": -77.12}, "matched_fields": ["imo", "mmsi", "call_sign"]}',
             'notes': 'Identity confirmed via AIS correlation', 'organization_id': '5 (FK to iuu_organizations.id)',
-            'listing_date': '2022-05-20', 'listing_reason': 'Fishing without valid license in ICCAT waters; failure to report catch',
+            'iuu_listing_date': '2022-05-20', 'iuu_listing_reason': 'Fishing without valid license in ICCAT waters; failure to report catch',
             'delisting_date': '2023-08-15', 'is_currently_listed': 'false', 'name': 'Peru', 'region': 'South America',
-            'country_id': '8 (FK to countries.id)', 'fishing_license_number': 'PE-2024-CM-0456',
-            'license_valid_from': '2024-01-01', 'license_valid_until': '2024-12-31',
-            'fishing_permit_status': 'VIGENTE', 'taxpayer_id': 'RUC-20123456789',
-            'additional_data': '{"port_assignments": ["Callao", "Chimbote"], "vessel_category": "Industrial", "authorized_species": ["Anchoveta", "Sardine"], "quota_mt": 2500}',
+            'country_id': '8 (FK to countries.id)', 'license_number': 'PE-2024-CM-0456',
+            'license_valid_from': '2024-01-01', 'permit_expiration': '2024-12-31',
+            'permit_status': 'VIGENTE', 'taxpayer_id': 'RUC-20123456789',
+            'additional_data': '{"port_assignments": ["Callao", "Chimbote"], "ship_category": "Industrial", "authorized_species": ["Anchoveta", "Sardine"], "quota_mt": 2500}',
             'fmfo_country_id': '4 (FK to fmfo_countries.id)', 'is_listed': 'true', 'listing_year': '2024',
-            'registration_number': 'FOS-2024-0123', 'certified_company': 'Ocean Fresh Seafood Co.',
-            'fao_fishing_area': 'Area 87 - Southeast Pacific', 'targeted_species': 'Anchoveta (Engraulis ringens)',
-            'certificate_status': 'Valid', 'name_from_date': '2015-06-01', 'name_to_date': '2019-03-15',
+            'fos_registration_number': 'FOS-2024-0123', 'fos_certified_company': 'Ocean Fresh Seafood Co.',
+            'fao_fishing_area_per_fos': 'Area 87 - Southeast Pacific', 'targeted_species_per_fos': 'Anchoveta (Engraulis ringens)',
+            'fos_certificate_status': 'Valid', 'name_from_date': '2015-06-01', 'name_to_date': '2019-03-15',
             'source': 'IHS Markit historical records', 'arrest_date': '2019-08-22',
             'arresting_authority': 'Liberia Coast Guard', 'arrest_location': 'Monrovia, Liberia (6.3N, 10.8W)',
-            'arrest_reason': 'Illegal transshipment at sea; fishing in restricted zone'
+            'arrest_reason': 'Illegal transshipment at sea; fishing in restricted zone',
+            'fao_global_record_link': 'https://fao.org/global-record/ship/12345'
         };
 
         const INITIAL_SCHEMA = {
-            vessels: { name: 'vessels', displayName: 'Vessels (Core)', type: 'core', description: 'Central table with 191K vessel records', fields: [
+            ships: { name: 'ships', displayName: 'Ships (Core)', type: 'core', description: 'Central table with 191K ship records', fields: [
                 { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'imo_number', type: 'VARCHAR(20)', sources: ['IMO Number'] },
                 { name: 'mmsi', type: 'VARCHAR(15)', sources: ['MMSI'] }, { name: 'call_sign', type: 'VARCHAR(20)', sources: ['Call Sign'] },
                 { name: 'national_registration_number', type: 'VARCHAR(50)', sources: ['National Registration Number'] },
                 { name: 'external_marking', type: 'VARCHAR(100)', sources: ['External Marking'] },
-                { name: 'vessel_name', type: 'VARCHAR(255)', sources: ['Vessel Name'] },
-                { name: 'vessel_name_local', type: 'VARCHAR(255)', sources: ['Vessel Name in local language'] },
-                { name: 'previous_name', type: 'TEXT', sources: ['Previous Name'] }, { name: 'flag', type: 'VARCHAR(100)', sources: ['Flag'] },
+                { name: 'ship_name', type: 'VARCHAR(255)', sources: ['Ship Name'] },
+                { name: 'flag', type: 'VARCHAR(100)', sources: ['Flag'] },
                 { name: 'port_of_registry', type: 'VARCHAR(255)', sources: ['Port of Registry'] },
                 { name: 'owner_name', type: 'VARCHAR(255)', sources: ['Owner Name'] }, { name: 'owner_address', type: 'TEXT', sources: ['Owner Address'] },
                 { name: 'operator_name', type: 'VARCHAR(255)', sources: ['Operator Name'] }, { name: 'operator_address', type: 'TEXT', sources: ['Operator Address'] },
-                { name: 'gear_type', type: 'VARCHAR(255)', sources: ['Gear'] }, { name: 'width_meters', type: 'DECIMAL(8,2)', sources: ['Width (m)'] },
-                { name: 'length_meters', type: 'DECIMAL(8,2)', sources: ['Length (m)'] }, { name: 'gross_tonnage', type: 'DECIMAL(10,2)', sources: ['Gross Tonnage'] },
-                { name: 'number_of_crew', type: 'INTEGER', sources: ['Number of Crew'] }, { name: 'ship_status', type: 'VARCHAR(100)', sources: ['Ship Status'] },
-                { name: 'ship_status_effective_date', type: 'DATE', sources: ['Ship Status Effective Date'] },
-                { name: 'iuu_combined_list_link', type: 'TEXT', sources: ['IUU Combined List Vessel Link'] },
-                { name: 'iuu_combined_list', type: 'BOOLEAN', sources: ['IUU Combined List'] },
-                { name: 'scraper_notes', type: 'TEXT', sources: ['Scraper Notes'] }, { name: 'sea_shepherd_arrest_info', type: 'TEXT', sources: ['Sea Shepherd Arrest Info'] }
+                { name: 'gear', type: 'VARCHAR(255)', sources: ['Gear'] }, { name: 'width_m', type: 'DECIMAL(8,2)', sources: ['Width (m)'] },
+                { name: 'length_m', type: 'DECIMAL(8,2)', sources: ['Length (m)'] }, { name: 'gross_tonnage', type: 'DECIMAL(10,2)', sources: ['Gross Tonnage'] },
+                { name: 'number_of_crew', type: 'INTEGER', sources: ['Number of Crew'] },
+                { name: 'fao_global_record_link', type: 'TEXT', sources: ['FAO Global Record Link'] },
+                { name: 'iuu_combined_list_ship_link', type: 'TEXT', sources: ['IUU Combined List Ship Link'] },
+                { name: 'scraper_notes', type: 'TEXT', sources: ['Scraper Notes'] }
             ]},
             authorizing_bodies: { name: 'authorizing_bodies', displayName: 'Authorizing Bodies (Lookup)', type: 'lookup', description: '14 records: RFMOs + EU + FAO', fields: [
                 { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'code', type: 'VARCHAR(20)', sources: [] },
                 { name: 'full_name', type: 'VARCHAR(255)', sources: [] }, { name: 'body_type', type: 'VARCHAR(50)', sources: [] }, { name: 'website_url', type: 'TEXT', sources: [] }
             ]},
-            vessel_authorizations: { name: 'vessel_authorizations', displayName: 'Vessel Authorizations (Junction)', type: 'junction', description: 'Replaces 68 RFMO/EU/FAO columns', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] }, { name: 'authorizing_body_id', type: 'INTEGER (FK)', sources: [] },
-                { name: 'authorization_number', type: 'VARCHAR(100)', sources: ['Authorization Number for SEAFO', 'Authorization Number for NEAFC', 'Authorization Number for IATTC', 'Authorization Number for NAFO', 'Authorization Number for IOTC', 'Authorization Number for WCPFC', 'Authorization Number for NPFC', 'Authorization Number for SPRFMO', 'Authorization Number for ICCAT', 'Authorization Number for CCAMLR', 'Authorization Number for GFCM'] },
-                { name: 'authorization_start_date', type: 'DATE', sources: ['Start dates for 11 RFMOs'] },
-                { name: 'authorization_end_date', type: 'DATE', sources: ['End dates for 11 RFMOs'] },
-                { name: 'authorization_link', type: 'TEXT', sources: ['Links for 13 sources including FAO'] },
-                { name: 'is_registered', type: 'BOOLEAN', sources: ['Registered with EU'] },
-                { name: 'source_info_last_updated', type: 'DATE', sources: ['Update dates (8 cols)'] },
-                { name: 'source_info_acquired', type: 'DATE', sources: ['Acquired dates (7 cols)'] }
+            ship_authorizations: { name: 'ship_authorizations', displayName: 'Ship Authorizations (Junction)', type: 'junction', description: 'Replaces 68 RFMO/EU/FAO columns', fields: [
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] }, { name: 'authorizing_body_id', type: 'INTEGER (FK)', sources: [] },
+                { name: 'authorization_number', type: 'VARCHAR(100)', sources: ['Authorization Number for NEAFC', 'Authorization Number for IATTC', 'Authorization Number for IOTC', 'Authorization Number for WCPFC', 'Authorization Number for NPFC', 'Authorization Number for SPRFMO', 'Authorization Number for ICCAT', 'Authorization Number for CCAMLR', 'Authorization Number for GFCM', 'Authorization Number for SEAFO', 'Authorization Number for NAFO'] },
+                { name: 'authorization_start_date', type: 'DATE', sources: ['Authorization Start Date for 11 RFMOs'] },
+                { name: 'authorization_end_date', type: 'DATE', sources: ['Authorization End Date for 11 RFMOs'] },
+                { name: 'ship_authorization_link', type: 'TEXT', sources: ['Ship Authorization Link for 13 sources'] },
+                { name: 'registered_with_eu', type: 'BOOLEAN', sources: ['Registered with EU'] },
+                { name: 'date_source_info_last_updated', type: 'DATE', sources: ['Date Source Info Last Updated (8 cols)'] },
+                { name: 'date_source_info_acquired', type: 'DATE', sources: ['Date Source Info Acquired (7 cols)'] }
             ]},
-            identity_sources: { name: 'identity_sources', displayName: 'Identity Sources (Lookup)', type: 'lookup', description: '4 records: MagicPort, GFW, IHS', fields: [
+            identity_sources: { name: 'identity_sources', displayName: 'Identity Sources (Lookup)', type: 'lookup', description: '3 records: MagicPort, GFW, IHS', fields: [
                 { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'code', type: 'VARCHAR(20)', sources: [] },
                 { name: 'full_name', type: 'VARCHAR(255)', sources: [] }, { name: 'description', type: 'TEXT', sources: [] }
             ]},
-            vessel_identity_confirmations: { name: 'vessel_identity_confirmations', displayName: 'Vessel Identity Confirmations (Junction)', type: 'junction', description: 'Tracks identity verification sources', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] }, { name: 'identity_source_id', type: 'INTEGER (FK)', sources: [] },
-                { name: 'is_confirmed', type: 'BOOLEAN', sources: ['Listed in MagicPort', 'Identity Confirmed by GFW', 'From GFW Data', 'IHS Markit Data'] },
+            ship_identity_confirmations: { name: 'ship_identity_confirmations', displayName: 'Ship Identity Confirmations (Junction)', type: 'junction', description: 'Tracks identity verification sources', fields: [
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] }, { name: 'identity_source_id', type: 'INTEGER (FK)', sources: [] },
+                { name: 'is_confirmed', type: 'BOOLEAN', sources: ['Listed in MagicPort', 'Identity Confirmed by Global Fishing Watch'] },
                 { name: 'confirmation_date', type: 'DATE', sources: [] }, { name: 'source_data', type: 'JSONB', sources: [] }, { name: 'notes', type: 'TEXT', sources: [] }
             ]},
             iuu_organizations: { name: 'iuu_organizations', displayName: 'IUU Organizations (Lookup)', type: 'lookup', description: '13 organizations maintaining IUU lists', fields: [
                 { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'code', type: 'VARCHAR(20)', sources: [] }, { name: 'full_name', type: 'VARCHAR(255)', sources: [] }
             ]},
-            vessel_iuu_listings: { name: 'vessel_iuu_listings', displayName: 'Vessel IUU Listings (Junction)', type: 'junction', description: 'Replaces 24 IUU columns', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] }, { name: 'organization_id', type: 'INTEGER (FK)', sources: [] },
-                { name: 'listing_date', type: 'DATE', sources: ['IUU Listing Date for 12 orgs'] },
-                { name: 'listing_reason', type: 'TEXT', sources: ['IUU Listing Reason for 12 orgs'] },
+            ship_iuu_listings: { name: 'ship_iuu_listings', displayName: 'Ship IUU Listings (Junction)', type: 'junction', description: 'Replaces 24 IUU columns', fields: [
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] }, { name: 'organization_id', type: 'INTEGER (FK)', sources: [] },
+                { name: 'iuu_listing_date', type: 'DATE', sources: ['IUU Listing Date for 12 orgs'] },
+                { name: 'iuu_listing_reason', type: 'TEXT', sources: ['IUU Listing Reason for 12 orgs'] },
                 { name: 'delisting_date', type: 'DATE', sources: [] }, { name: 'is_currently_listed', type: 'BOOLEAN', sources: [] }
             ]},
             countries: { name: 'countries', displayName: 'Countries (Lookup)', type: 'lookup', description: '15 countries with registries', fields: [
                 { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'code', type: 'VARCHAR(10)', sources: [] },
                 { name: 'name', type: 'VARCHAR(255)', sources: [] }, { name: 'region', type: 'VARCHAR(100)', sources: [] }
             ]},
-            vessel_country_registrations: { name: 'vessel_country_registrations', displayName: 'Vessel Country Registrations (Junction)', type: 'junction', description: 'Replaces ~50 country columns', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] }, { name: 'country_id', type: 'INTEGER (FK)', sources: [] },
+            ship_country_registrations: { name: 'ship_country_registrations', displayName: 'Ship Country Registrations (Junction)', type: 'junction', description: 'Replaces ~50 country columns', fields: [
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] }, { name: 'country_id', type: 'INTEGER (FK)', sources: [] },
                 { name: 'is_registered', type: 'BOOLEAN', sources: [] },
-                { name: 'fishing_license_number', type: 'VARCHAR(100)', sources: ['PERU_License Number', 'THAI_License Number', 'INDONESIA_License'] },
+                { name: 'license_number', type: 'VARCHAR(100)', sources: ['PERU License Number', 'THAI License Number', 'INDONESIA License'] },
                 { name: 'license_valid_from', type: 'DATE', sources: [] },
-                { name: 'license_valid_until', type: 'DATE', sources: ['PERU_Permit Expiration', 'THAI_Cert Expiration'] },
-                { name: 'fishing_permit_status', type: 'VARCHAR(100)', sources: ['PERU_Permit Status', 'THAI_Permit Availability'] },
-                { name: 'taxpayer_id', type: 'VARCHAR(100)', sources: ['PERU_Taxpayer ID'] }, { name: 'additional_data', type: 'JSONB', sources: [] }
+                { name: 'permit_expiration', type: 'DATE', sources: ['PERU Permit Expiration', 'THAI Cert Expiration'] },
+                { name: 'permit_status', type: 'VARCHAR(100)', sources: ['PERU Permit Status', 'THAI Permit Availability'] },
+                { name: 'taxpayer_id', type: 'VARCHAR(100)', sources: ['PERU Taxpayer ID'] }, { name: 'additional_data', type: 'JSONB', sources: [] }
             ]},
             fmfo_countries: { name: 'fmfo_countries', displayName: 'FMFO Countries (Lookup)', type: 'lookup', description: '11 FMFO monitoring countries', fields: [
                 { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'code', type: 'VARCHAR(10)', sources: [] }, { name: 'name', type: 'VARCHAR(255)', sources: [] }
             ]},
-            vessel_fmfo_listings: { name: 'vessel_fmfo_listings', displayName: 'Vessel FMFO Listings (Junction)', type: 'junction', description: 'Replaces 11 FMFO boolean columns', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] }, { name: 'fmfo_country_id', type: 'INTEGER (FK)', sources: [] },
+            ship_fmfo_listings: { name: 'ship_fmfo_listings', displayName: 'Ship FMFO Listings (Junction)', type: 'junction', description: 'Replaces 11 FMFO boolean columns', fields: [
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] }, { name: 'fmfo_country_id', type: 'INTEGER (FK)', sources: [] },
                 { name: 'is_listed', type: 'BOOLEAN', sources: ['Peru FMFO', 'India FMFO', 'Ecuador FMFO', 'Thailand FMFO', '+7 more'] },
                 { name: 'listing_year', type: 'INTEGER', sources: [] }, { name: 'notes', type: 'TEXT', sources: [] }
             ]},
             friend_of_sea_certifications: { name: 'friend_of_sea_certifications', displayName: 'Friend of the Sea Certs', type: 'supporting', description: 'FOS certification data', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
-                { name: 'registration_number', type: 'VARCHAR(100)', sources: ['Friend of the Sea Registration Number'] },
-                { name: 'certified_company', type: 'VARCHAR(255)', sources: ['Company authorized to sell FOS products'] },
-                { name: 'fao_fishing_area', type: 'VARCHAR(255)', sources: ['FAO fishing area per FOS'] },
-                { name: 'targeted_species', type: 'TEXT', sources: ['Targeted species per FOS'] },
-                { name: 'certificate_status', type: 'VARCHAR(50)', sources: ['FOS Certificate Status'] }
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] },
+                { name: 'fos_registration_number', type: 'VARCHAR(100)', sources: ['Friend of the Sea Registration Number'] },
+                { name: 'fos_certified_company', type: 'VARCHAR(255)', sources: ['Company authorized to sell FOS products'] },
+                { name: 'fao_fishing_area_per_fos', type: 'VARCHAR(255)', sources: ['FAO fishing area per FOS'] },
+                { name: 'targeted_species_per_fos', type: 'TEXT', sources: ['Targeted species per FOS'] },
+                { name: 'fos_certificate_status', type: 'VARCHAR(50)', sources: ['FOS Certificate Status'] }
             ]},
-            vessel_name_history: { name: 'vessel_name_history', displayName: 'Vessel Name History', type: 'supporting', description: 'Historical names for compliance', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+            ship_name_history: { name: 'ship_name_history', displayName: 'Ship Name History', type: 'supporting', description: 'Historical names for compliance', fields: [
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] },
                 { name: 'previous_name', type: 'VARCHAR(255)', sources: ['Previous Name'] },
                 { name: 'name_from_date', type: 'DATE', sources: [] }, { name: 'name_to_date', type: 'DATE', sources: [] }, { name: 'source', type: 'VARCHAR(255)', sources: [] }
             ]},
-            vessel_arrests: { name: 'vessel_arrests', displayName: 'Vessel Arrests', type: 'supporting', description: 'Enforcement arrest records', fields: [
-                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'vessel_id', type: 'INTEGER (FK)', sources: [] },
+            ship_arrests: { name: 'ship_arrests', displayName: 'Ship Arrests', type: 'supporting', description: 'Enforcement arrest records', fields: [
+                { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'ship_id', type: 'INTEGER (FK)', sources: [] },
                 { name: 'arrest_date', type: 'DATE', sources: [] }, { name: 'arresting_authority', type: 'VARCHAR(255)', sources: [] },
                 { name: 'arrest_location', type: 'VARCHAR(255)', sources: [] }, { name: 'arrest_reason', type: 'TEXT', sources: ['Sea Shepherd Arrest Info'] }
             ]}
@@ -381,6 +380,16 @@
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900">Ship Database Schema Designer</h1>
                                 <p className="text-sm text-gray-500 mt-1">{allColumns.length} columns | {totalRows.toLocaleString()} rows</p>
+                                <div className="flex gap-4 mt-2">
+                                    <a href="team_share_data.csv" download className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                        Download Sample Data (1,000 rows)
+                                    </a>
+                                    <a href="https://github.com/michaelsparks13/ship-schema-designer" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1">
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                                        Fork on GitHub
+                                    </a>
+                                </div>
                             </div>
                             <div className="flex items-center gap-3">
                                 {editMode && (
