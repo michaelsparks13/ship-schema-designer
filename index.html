@@ -536,7 +536,7 @@
                         <div className="max-w-full mx-auto px-4 py-4 flex justify-between items-center">
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900">Ship Database Schema Designer</h1>
-                                <p className="text-sm text-gray-500 mt-1">{allColumns.length} columns | {totalRows.toLocaleString()} rows</p>
+                                <p className="text-sm text-gray-500 mt-1">144 fields | 183,000 rows</p>
                                 <div className="flex gap-4 mt-2">
                                     <a href="team_share_data.csv" download className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -580,7 +580,7 @@
                         <div className="bg-white rounded-lg shadow p-6 mb-6">
                             <h2 className="text-xl font-bold mb-4">Schema Transformation Summary</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200"><div className="text-3xl font-bold text-red-600">{allColumns.length}</div><div className="text-sm text-red-700">Current Columns</div></div>
+                                <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200"><div className="text-3xl font-bold text-red-600">144</div><div className="text-sm text-red-700">Current Fields</div></div>
                                 <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200"><div className="text-3xl font-bold text-green-600">{tableOrder.length}</div><div className="text-sm text-green-700">New Tables</div></div>
                                 <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200"><div className="text-3xl font-bold text-blue-600">{tableOrder.reduce((sum, k) => sum + (schema[k]?.fields.length || 0), 0)}</div><div className="text-sm text-blue-700">New Fields</div></div>
                                 <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200"><div className="text-3xl font-bold text-purple-600">51%</div><div className="text-sm text-purple-700">Reduction</div></div>
@@ -677,7 +677,7 @@
                         </div>
 
                         <details className="bg-white rounded-lg shadow mb-6">
-                            <summary className="p-4 cursor-pointer font-bold text-lg flex items-center justify-between"><span><span className="text-red-600">CURRENT</span> Flat Structure ({allColumns.length} Columns)</span><span className="text-sm font-normal text-gray-500">Click to expand</span></summary>
+                            <summary className="p-4 cursor-pointer font-bold text-lg flex items-center justify-between"><span><span className="text-red-600">CURRENT</span> Flat Structure (144 Fields)</span><span className="text-sm font-normal text-gray-500">Click to expand</span></summary>
                             <div className="p-4 border-t">
                                 <input type="text" placeholder="Search columns..." value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} className="w-full max-w-md px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 mb-4" />
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 max-h-[500px] overflow-y-auto">
