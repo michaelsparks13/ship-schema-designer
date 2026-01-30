@@ -22,118 +22,58 @@
         .field-item.has-mapping:hover { background-color: rgb(219 234 254); }
         .source-column-highlight { animation: pulse-highlight 1.5s ease-in-out infinite; }
         @keyframes pulse-highlight { 0%, 100% { background-color: rgb(254 249 195); } 50% { background-color: rgb(253 224 71); } }
-        .field-item { cursor: pointer; }
-        .field-item.has-example:hover { background-color: rgb(219 234 254); }
+        .edit-btn { opacity: 0; transition: opacity 0.15s; }
+        .field-item:hover .edit-btn, .table-header:hover .edit-btn { opacity: 1; }
+        .drag-handle { cursor: grab; }
+        .drag-handle:active { cursor: grabbing; }
+        .dragging { opacity: 0.5; }
+        .drop-target { border: 2px dashed #3b82f6 !important; background-color: #eff6ff !important; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
+
         const FIELD_EXAMPLES = {
-            // Vessels (Core) table
-            'id': '12345',
-            'imo_number': '9134270',
-            'mmsi': '412345678',
-            'call_sign': 'BQKV',
-            'national_registration_number': 'PE-01234-CM',
-            'external_marking': 'INKA 201',
-            'vessel_name': 'HAI FENG 823',
-            'vessel_name_local': '海丰823',
-            'previous_name': 'LIAN RUN 22',
-            'flag': 'China',
-            'port_of_registry': 'Zhoushan',
-            'owner_name': 'Zhejiang Ocean Family Co Ltd',
-            'owner_address': '88 Haitian Road, Zhoushan, Zhejiang',
-            'operator_name': 'Pingtan Marine Enterprise',
-            'operator_address': '18 Pingtan Road, Fuzhou, Fujian',
-            'gear_type': 'Trawlers - Midwater',
-            'width_meters': '13.5',
-            'length_meters': '58.2',
-            'gross_tonnage': '1,245',
-            'number_of_crew': '28',
-            'ship_status': 'Active',
-            'ship_status_effective_date': '2024-01-15',
-            'iuu_combined_list_link': 'https://iuu-vessels.org/vessel/12345',
-            'iuu_combined_list': 'true',
-            'scraper_notes': 'Vessel data updated from WCPFC registry 2024-03',
+            'id': '12345', 'imo_number': '9134270', 'mmsi': '412345678', 'call_sign': 'BQKV',
+            'national_registration_number': 'PE-01234-CM', 'external_marking': 'INKA 201',
+            'vessel_name': 'HAI FENG 823', 'vessel_name_local': '海丰823',
+            'previous_name': 'LIAN RUN 22', 'flag': 'China', 'port_of_registry': 'Zhoushan',
+            'owner_name': 'Zhejiang Ocean Family Co Ltd', 'owner_address': '88 Haitian Road, Zhoushan, Zhejiang',
+            'operator_name': 'Pingtan Marine Enterprise', 'operator_address': '18 Pingtan Road, Fuzhou, Fujian',
+            'gear_type': 'Trawlers - Midwater', 'width_meters': '13.5', 'length_meters': '58.2',
+            'gross_tonnage': '1,245', 'number_of_crew': '28', 'ship_status': 'Active',
+            'ship_status_effective_date': '2024-01-15', 'iuu_combined_list_link': 'https://iuu-vessels.org/vessel/12345',
+            'iuu_combined_list': 'true', 'scraper_notes': 'Vessel data updated from WCPFC registry 2024-03',
             'sea_shepherd_arrest_info': 'Detained in Liberia Aug 2019 for illegal transshipment',
-
-            // Authorizing Bodies (Lookup) table
-            'code': 'WCPFC',
-            'full_name': 'Western and Central Pacific Fisheries Commission',
-            'body_type': 'RFMO',
-            'website_url': 'https://www.wcpfc.int/',
+            'code': 'WCPFC', 'full_name': 'Western and Central Pacific Fisheries Commission',
+            'body_type': 'RFMO', 'website_url': 'https://www.wcpfc.int/',
             'description': 'Primary source for vessel identity verification',
-
-            // Vessel Authorizations (Junction) table
-            'vessel_id': '12345 (FK to vessels.id)',
-            'authorizing_body_id': '3 (FK to authorizing_bodies.id)',
-            'authorization_number': 'VR-2024-CHN-0892',
-            'authorization_start_date': '2024-01-01',
-            'authorization_end_date': '2024-12-31',
-            'authorization_link': 'https://wcpfc.int/vessel/VR-2024-CHN-0892',
-            'is_registered': 'true',
-            'source_info_last_updated': '2024-03-15',
-            'source_info_acquired': '2024-02-01',
-
-            // Identity Sources (Lookup) table
-            'identity_source_id': '2 (FK to identity_sources.id)',
-
-            // Vessel Identity Confirmations (Junction) table
-            'is_confirmed': 'true',
+            'vessel_id': '12345 (FK to vessels.id)', 'authorizing_body_id': '3 (FK to authorizing_bodies.id)',
+            'authorization_number': 'VR-2024-CHN-0892', 'authorization_start_date': '2024-01-01',
+            'authorization_end_date': '2024-12-31', 'authorization_link': 'https://wcpfc.int/vessel/VR-2024-CHN-0892',
+            'is_registered': 'true', 'source_info_last_updated': '2024-03-15', 'source_info_acquired': '2024-02-01',
+            'identity_source_id': '2 (FK to identity_sources.id)', 'is_confirmed': 'true',
             'confirmation_date': '2024-01-20',
             'source_data': '{"gfw_vessel_id": "CHN-FV-8823", "confidence_score": 0.95, "last_ais_position": {"lat": -12.45, "lon": -77.12}, "matched_fields": ["imo", "mmsi", "call_sign"]}',
-            'notes': 'Identity confirmed via AIS correlation',
-
-            // IUU Organizations (Lookup) table
-            'organization_id': '5 (FK to iuu_organizations.id)',
-
-            // Vessel IUU Listings (Junction) table
-            'listing_date': '2022-05-20',
-            'listing_reason': 'Fishing without valid license in ICCAT waters; failure to report catch',
-            'delisting_date': '2023-08-15',
-            'is_currently_listed': 'false',
-
-            // Countries (Lookup) table
-            'name': 'Peru',
-            'region': 'South America',
-
-            // Vessel Country Registrations (Junction) table
-            'country_id': '8 (FK to countries.id)',
-            'fishing_license_number': 'PE-2024-CM-0456',
-            'license_valid_from': '2024-01-01',
-            'license_valid_until': '2024-12-31',
-            'fishing_permit_status': 'VIGENTE',
-            'taxpayer_id': 'RUC-20123456789',
+            'notes': 'Identity confirmed via AIS correlation', 'organization_id': '5 (FK to iuu_organizations.id)',
+            'listing_date': '2022-05-20', 'listing_reason': 'Fishing without valid license in ICCAT waters; failure to report catch',
+            'delisting_date': '2023-08-15', 'is_currently_listed': 'false', 'name': 'Peru', 'region': 'South America',
+            'country_id': '8 (FK to countries.id)', 'fishing_license_number': 'PE-2024-CM-0456',
+            'license_valid_from': '2024-01-01', 'license_valid_until': '2024-12-31',
+            'fishing_permit_status': 'VIGENTE', 'taxpayer_id': 'RUC-20123456789',
             'additional_data': '{"port_assignments": ["Callao", "Chimbote"], "vessel_category": "Industrial", "authorized_species": ["Anchoveta", "Sardine"], "quota_mt": 2500}',
-
-            // FMFO Countries (Lookup) table
-            'fmfo_country_id': '4 (FK to fmfo_countries.id)',
-
-            // Vessel FMFO Listings (Junction) table
-            'is_listed': 'true',
-            'listing_year': '2024',
-
-            // Friend of the Sea Certifications table
-            'registration_number': 'FOS-2024-0123',
-            'certified_company': 'Ocean Fresh Seafood Co.',
-            'fao_fishing_area': 'Area 87 - Southeast Pacific',
-            'targeted_species': 'Anchoveta (Engraulis ringens)',
-            'certificate_status': 'Valid',
-
-            // Vessel Name History table
-            'name_from_date': '2015-06-01',
-            'name_to_date': '2019-03-15',
-            'source': 'IHS Markit historical records',
-
-            // Vessel Arrests table
-            'arrest_date': '2019-08-22',
-            'arresting_authority': 'Liberia Coast Guard',
-            'arrest_location': 'Monrovia, Liberia (6.3°N, 10.8°W)',
+            'fmfo_country_id': '4 (FK to fmfo_countries.id)', 'is_listed': 'true', 'listing_year': '2024',
+            'registration_number': 'FOS-2024-0123', 'certified_company': 'Ocean Fresh Seafood Co.',
+            'fao_fishing_area': 'Area 87 - Southeast Pacific', 'targeted_species': 'Anchoveta (Engraulis ringens)',
+            'certificate_status': 'Valid', 'name_from_date': '2015-06-01', 'name_to_date': '2019-03-15',
+            'source': 'IHS Markit historical records', 'arrest_date': '2019-08-22',
+            'arresting_authority': 'Liberia Coast Guard', 'arrest_location': 'Monrovia, Liberia (6.3N, 10.8W)',
             'arrest_reason': 'Illegal transshipment at sea; fishing in restricted zone'
         };
-        const NEW_SCHEMA = {
+
+        const INITIAL_SCHEMA = {
             vessels: { name: 'vessels', displayName: 'Vessels (Core)', type: 'core', description: 'Central table with 191K vessel records', fields: [
                 { name: 'id', type: 'INTEGER (PK)', sources: [] }, { name: 'imo_number', type: 'VARCHAR(20)', sources: ['IMO Number'] },
                 { name: 'mmsi', type: 'VARCHAR(15)', sources: ['MMSI'] }, { name: 'call_sign', type: 'VARCHAR(20)', sources: ['Call Sign'] },
@@ -226,6 +166,8 @@
             ]}
         };
 
+        const TABLE_TYPES = ['core', 'lookup', 'junction', 'supporting'];
+
         function App() {
             const [loading, setLoading] = useState(true);
             const [loadingStatus, setLoadingStatus] = useState('Loading...');
@@ -239,6 +181,25 @@
             const [highlightedSourceColumns, setHighlightedSourceColumns] = useState([]);
             const [showFieldMappingModal, setShowFieldMappingModal] = useState(false);
             const [showExampleModal, setShowExampleModal] = useState(false);
+
+            // Edit mode state
+            const [editMode, setEditMode] = useState(false);
+            const [schema, setSchema] = useState(INITIAL_SCHEMA);
+            const [tableOrder, setTableOrder] = useState(Object.keys(INITIAL_SCHEMA));
+
+            // Modal states for editing
+            const [showEditTableModal, setShowEditTableModal] = useState(false);
+            const [showAddTableModal, setShowAddTableModal] = useState(false);
+            const [showEditFieldModal, setShowEditFieldModal] = useState(false);
+            const [showMoveFieldModal, setShowMoveFieldModal] = useState(false);
+            const [editingTable, setEditingTable] = useState(null);
+            const [editingField, setEditingField] = useState(null);
+            const [editingFieldIndex, setEditingFieldIndex] = useState(null);
+
+            // Drag state
+            const [draggedField, setDraggedField] = useState(null);
+            const [draggedTable, setDraggedTable] = useState(null);
+            const [dropTarget, setDropTarget] = useState(null);
 
             useEffect(() => { loadCSVData(); }, []);
 
@@ -264,38 +225,202 @@
                 } catch (error) { console.error(error); setLoadError('Failed to load data.'); setLoading(false); }
             };
 
+            // Helper functions
             const getFillBarColor = (pct) => { const p = parseFloat(pct); if (p >= 80) return 'bg-green-500'; if (p >= 50) return 'bg-yellow-500'; if (p >= 20) return 'bg-orange-500'; return 'bg-red-500'; };
             const getTypeColor = (type) => { switch(type) { case 'core': return 'border-blue-500'; case 'lookup': return 'border-green-500'; case 'junction': return 'border-purple-500'; case 'supporting': return 'border-orange-500'; default: return 'border-gray-500'; } };
             const getTypeBadgeColor = (type) => { switch(type) { case 'core': return 'bg-blue-100 text-blue-800'; case 'lookup': return 'bg-green-100 text-green-800'; case 'junction': return 'bg-purple-100 text-purple-800'; case 'supporting': return 'bg-orange-100 text-orange-800'; default: return 'bg-gray-100 text-gray-800'; } };
-            const handleFieldClick = (tableName, field) => {
-                setSelectedNewTable(tableName);
-                setSelectedNewField(field);
-                if (field.sources?.length > 0) {
-                    setHighlightedSourceColumns(field.sources);
-                    setShowFieldMappingModal(true);
-                } else {
-                    setShowExampleModal(true);
-                }
-            };
             const getFilteredColumns = (columns) => { if (!searchFilter.trim()) return columns; const f = searchFilter.toLowerCase(); return columns.filter(col => col.toLowerCase().includes(f)); };
             const getExampleValue = (fieldName) => FIELD_EXAMPLES[fieldName] || null;
+
+            // Field click handler
+            const handleFieldClick = (tableName, field, fieldIndex) => {
+                if (editMode) {
+                    setEditingTable(tableName);
+                    setEditingField({...field});
+                    setEditingFieldIndex(fieldIndex);
+                    setShowEditFieldModal(true);
+                } else {
+                    setSelectedNewTable(tableName);
+                    setSelectedNewField(field);
+                    if (field.sources?.length > 0) {
+                        setHighlightedSourceColumns(field.sources);
+                        setShowFieldMappingModal(true);
+                    } else {
+                        setShowExampleModal(true);
+                    }
+                }
+            };
+
+            // Schema editing functions
+            const updateTableName = (oldKey, newName, newDisplayName, newType, newDescription) => {
+                const newSchema = {...schema};
+                const table = {...newSchema[oldKey]};
+                table.name = newName;
+                table.displayName = newDisplayName;
+                table.type = newType;
+                table.description = newDescription;
+
+                if (oldKey !== newName) {
+                    delete newSchema[oldKey];
+                    newSchema[newName] = table;
+                    setTableOrder(tableOrder.map(k => k === oldKey ? newName : k));
+                } else {
+                    newSchema[oldKey] = table;
+                }
+                setSchema(newSchema);
+            };
+
+            const deleteTable = (tableKey) => {
+                if (confirm(`Delete table "${tableKey}"? This cannot be undone.`)) {
+                    const newSchema = {...schema};
+                    delete newSchema[tableKey];
+                    setSchema(newSchema);
+                    setTableOrder(tableOrder.filter(k => k !== tableKey));
+                }
+            };
+
+            const addTable = (name, displayName, type, description) => {
+                const newSchema = {...schema};
+                newSchema[name] = {
+                    name,
+                    displayName,
+                    type,
+                    description,
+                    fields: [{ name: 'id', type: 'INTEGER (PK)', sources: [] }]
+                };
+                setSchema(newSchema);
+                setTableOrder([...tableOrder, name]);
+            };
+
+            const updateField = (tableKey, fieldIndex, newField) => {
+                const newSchema = {...schema};
+                newSchema[tableKey].fields[fieldIndex] = newField;
+                setSchema(newSchema);
+            };
+
+            const deleteField = (tableKey, fieldIndex) => {
+                const newSchema = {...schema};
+                newSchema[tableKey].fields.splice(fieldIndex, 1);
+                setSchema(newSchema);
+            };
+
+            const addField = (tableKey) => {
+                const newSchema = {...schema};
+                newSchema[tableKey].fields.push({ name: 'new_field', type: 'VARCHAR(255)', sources: [] });
+                setSchema(newSchema);
+            };
+
+            const moveFieldUp = (tableKey, fieldIndex) => {
+                if (fieldIndex === 0) return;
+                const newSchema = {...schema};
+                const fields = [...newSchema[tableKey].fields];
+                [fields[fieldIndex - 1], fields[fieldIndex]] = [fields[fieldIndex], fields[fieldIndex - 1]];
+                newSchema[tableKey].fields = fields;
+                setSchema(newSchema);
+            };
+
+            const moveFieldDown = (tableKey, fieldIndex) => {
+                const newSchema = {...schema};
+                const fields = [...newSchema[tableKey].fields];
+                if (fieldIndex >= fields.length - 1) return;
+                [fields[fieldIndex], fields[fieldIndex + 1]] = [fields[fieldIndex + 1], fields[fieldIndex]];
+                newSchema[tableKey].fields = fields;
+                setSchema(newSchema);
+            };
+
+            const moveFieldToTable = (fromTable, fieldIndex, toTable) => {
+                const newSchema = {...schema};
+                const field = newSchema[fromTable].fields[fieldIndex];
+                newSchema[fromTable].fields.splice(fieldIndex, 1);
+                newSchema[toTable].fields.push(field);
+                setSchema(newSchema);
+            };
+
+            const moveTableUp = (tableKey) => {
+                const idx = tableOrder.indexOf(tableKey);
+                if (idx <= 0) return;
+                const newOrder = [...tableOrder];
+                [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+                setTableOrder(newOrder);
+            };
+
+            const moveTableDown = (tableKey) => {
+                const idx = tableOrder.indexOf(tableKey);
+                if (idx >= tableOrder.length - 1) return;
+                const newOrder = [...tableOrder];
+                [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+                setTableOrder(newOrder);
+            };
+
+            const exportSchema = () => {
+                const orderedSchema = {};
+                tableOrder.forEach(key => { if (schema[key]) orderedSchema[key] = schema[key]; });
+                const blob = new Blob([JSON.stringify(orderedSchema, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ship_schema.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const resetSchema = () => {
+                if (confirm('Reset schema to original? All changes will be lost.')) {
+                    setSchema(INITIAL_SCHEMA);
+                    setTableOrder(Object.keys(INITIAL_SCHEMA));
+                }
+            };
 
             if (loading) return <div className="min-h-screen bg-gray-100 flex items-center justify-center"><div className="text-center"><div className="loading-spinner mx-auto mb-4"></div><p className="text-gray-600">{loadingStatus}</p></div></div>;
             if (loadError) return <div className="min-h-screen bg-gray-100 flex items-center justify-center"><div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center"><h2 className="text-xl font-bold mb-2">Error</h2><p className="text-gray-600 mb-4">{loadError}</p><button onClick={loadCSVData} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Retry</button></div></div>;
 
             return (
                 <div className="min-h-screen bg-gray-100">
-                    <header className="bg-white shadow-sm border-b sticky top-0 z-40"><div className="max-w-full mx-auto px-4 py-4"><h1 className="text-2xl font-bold text-gray-900">Ship Database Schema Designer</h1><p className="text-sm text-gray-500 mt-1">{allColumns.length} columns | {totalRows.toLocaleString()} rows</p></div></header>
+                    <header className="bg-white shadow-sm border-b sticky top-0 z-40">
+                        <div className="max-w-full mx-auto px-4 py-4 flex justify-between items-center">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">Ship Database Schema Designer</h1>
+                                <p className="text-sm text-gray-500 mt-1">{allColumns.length} columns | {totalRows.toLocaleString()} rows</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {editMode && (
+                                    <>
+                                        <button onClick={() => setShowAddTableModal(true)} className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-1">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                            Add Table
+                                        </button>
+                                        <button onClick={exportSchema} className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                            Export JSON
+                                        </button>
+                                        <button onClick={resetSchema} className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm">Reset</button>
+                                    </>
+                                )}
+                                <button onClick={() => setEditMode(!editMode)} className={`px-4 py-2 rounded-lg text-sm font-medium ${editMode ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                                    {editMode ? 'Exit Edit Mode' : 'Edit Schema'}
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
                     <div className="max-w-full mx-auto px-4 py-6">
+                        {editMode && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                                <p className="text-yellow-800 font-medium">Edit Mode Active</p>
+                                <p className="text-yellow-700 text-sm mt-1">Click on tables or fields to edit. Use arrows to reorder. Changes are saved in browser memory until you export.</p>
+                            </div>
+                        )}
+
                         <div className="bg-white rounded-lg shadow p-6 mb-6">
                             <h2 className="text-xl font-bold mb-4">Schema Transformation Summary</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200"><div className="text-3xl font-bold text-red-600">{allColumns.length}</div><div className="text-sm text-red-700">Current Columns</div></div>
-                                <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200"><div className="text-3xl font-bold text-green-600">{Object.keys(NEW_SCHEMA).length}</div><div className="text-sm text-green-700">New Tables</div></div>
-                                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200"><div className="text-3xl font-bold text-blue-600">{Object.values(NEW_SCHEMA).reduce((sum, t) => sum + t.fields.length, 0)}</div><div className="text-sm text-blue-700">New Fields</div></div>
+                                <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200"><div className="text-3xl font-bold text-green-600">{tableOrder.length}</div><div className="text-sm text-green-700">New Tables</div></div>
+                                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200"><div className="text-3xl font-bold text-blue-600">{tableOrder.reduce((sum, k) => sum + (schema[k]?.fields.length || 0), 0)}</div><div className="text-sm text-blue-700">New Fields</div></div>
                                 <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200"><div className="text-3xl font-bold text-purple-600">51%</div><div className="text-sm text-purple-700">Reduction</div></div>
                             </div>
                         </div>
+
                         <div className="bg-white rounded-lg shadow p-4 mb-6">
                             <h3 className="font-semibold mb-3">Table Types</h3>
                             <div className="flex flex-wrap gap-4">
@@ -303,27 +428,88 @@
                                 <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border-2 border-green-500 bg-green-50"></div><span className="text-sm">Lookup</span></div>
                                 <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50"></div><span className="text-sm">Junction</span></div>
                                 <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border-2 border-orange-500 bg-orange-50"></div><span className="text-sm">Supporting</span></div>
-                                <div className="flex items-center gap-2 ml-8"><div className="w-4 h-4 rounded bg-blue-100"></div><span className="text-sm">Click any field to see example value</span></div>
+                                <div className="flex items-center gap-2 ml-8"><div className="w-4 h-4 rounded bg-blue-100"></div><span className="text-sm">{editMode ? 'Click to edit' : 'Click for example'}</span></div>
                             </div>
                         </div>
+
                         <div className="mb-8">
-                            <h2 className="text-xl font-bold mb-4"><span className="text-green-600">NEW</span> Relational Schema (14 Tables)</h2>
+                            <h2 className="text-xl font-bold mb-4"><span className="text-green-600">NEW</span> Relational Schema ({tableOrder.length} Tables)</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {Object.entries(NEW_SCHEMA).map(([tableName, table]) => (
-                                    <div key={tableName} className={`schema-table bg-white rounded-lg shadow border-l-4 ${getTypeColor(table.type)}`}>
-                                        <div className="p-4 border-b bg-gray-50"><div className="flex items-center justify-between"><h3 className="font-bold text-gray-900">{table.name}</h3><span className={`text-xs px-2 py-1 rounded ${getTypeBadgeColor(table.type)}`}>{table.type}</span></div><p className="text-xs text-gray-500 mt-1">{table.description}</p></div>
-                                        <div className="p-2 max-h-[300px] overflow-y-auto">
-                                            {table.fields.map((field, idx) => { const hasMapping = field.sources?.length > 0; const example = getExampleValue(field.name);
-                                                return (<div key={idx} onClick={() => handleFieldClick(tableName, field)} className={`field-item p-2 rounded text-sm border mb-1 ${hasMapping ? 'bg-blue-50 border-blue-200 has-mapping has-example' : example ? 'bg-gray-50 border-gray-200 has-example' : 'bg-gray-50 border-gray-200'}`}>
-                                                    <div className="flex justify-between items-start"><span className="font-medium text-gray-800">{field.name}</span><span className="text-xs text-gray-500 ml-2">{field.type}</span></div>
-                                                    {hasMapping && <div className="text-xs text-blue-600 mt-1">Replaces {field.sources.length} column{field.sources.length > 1 ? 's' : ''}</div>}
-                                                    {!hasMapping && example && <div className="text-xs text-gray-500 mt-1">Click for example</div>}
-                                                </div>); })}
+                                {tableOrder.map((tableName, tableIndex) => {
+                                    const table = schema[tableName];
+                                    if (!table) return null;
+                                    return (
+                                        <div key={tableName} className={`schema-table bg-white rounded-lg shadow border-l-4 ${getTypeColor(table.type)}`}>
+                                            <div className="table-header p-4 border-b bg-gray-50">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="font-bold text-gray-900 truncate flex-1">{table.name}</h3>
+                                                    <div className="flex items-center gap-1">
+                                                        {editMode && (
+                                                            <>
+                                                                <button onClick={() => moveTableUp(tableName)} className="edit-btn p-1 text-gray-400 hover:text-gray-600" title="Move up">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                                                                </button>
+                                                                <button onClick={() => moveTableDown(tableName)} className="edit-btn p-1 text-gray-400 hover:text-gray-600" title="Move down">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                                                </button>
+                                                                <button onClick={() => { setEditingTable(tableName); setShowEditTableModal(true); }} className="edit-btn p-1 text-blue-500 hover:text-blue-700" title="Edit table">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                                </button>
+                                                                <button onClick={() => deleteTable(tableName)} className="edit-btn p-1 text-red-500 hover:text-red-700" title="Delete table">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        <span className={`text-xs px-2 py-1 rounded ml-1 ${getTypeBadgeColor(table.type)}`}>{table.type}</span>
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">{table.description}</p>
+                                            </div>
+                                            <div className="p-2 max-h-[300px] overflow-y-auto">
+                                                {table.fields.map((field, idx) => {
+                                                    const hasMapping = field.sources?.length > 0;
+                                                    const example = getExampleValue(field.name);
+                                                    return (
+                                                        <div key={idx} onClick={() => handleFieldClick(tableName, field, idx)} className={`field-item p-2 rounded text-sm border mb-1 ${hasMapping ? 'bg-blue-50 border-blue-200 has-mapping' : example ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-gray-200'}`}>
+                                                            <div className="flex justify-between items-start">
+                                                                <span className="font-medium text-gray-800 flex-1 truncate">{field.name}</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    {editMode && (
+                                                                        <>
+                                                                            <button onClick={(e) => { e.stopPropagation(); moveFieldUp(tableName, idx); }} className="edit-btn p-0.5 text-gray-400 hover:text-gray-600">
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); moveFieldDown(tableName, idx); }} className="edit-btn p-0.5 text-gray-400 hover:text-gray-600">
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); setEditingTable(tableName); setEditingField(field); setEditingFieldIndex(idx); setShowMoveFieldModal(true); }} className="edit-btn p-0.5 text-purple-500 hover:text-purple-700" title="Move to table">
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                                                            </button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete field?')) deleteField(tableName, idx); }} className="edit-btn p-0.5 text-red-500 hover:text-red-700">
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                    <span className="text-xs text-gray-500 ml-1">{field.type}</span>
+                                                                </div>
+                                                            </div>
+                                                            {!editMode && hasMapping && <div className="text-xs text-blue-600 mt-1">Replaces {field.sources.length} column{field.sources.length > 1 ? 's' : ''}</div>}
+                                                            {!editMode && !hasMapping && example && <div className="text-xs text-gray-500 mt-1">Click for example</div>}
+                                                        </div>
+                                                    );
+                                                })}
+                                                {editMode && (
+                                                    <button onClick={() => addField(tableName)} className="w-full p-2 border-2 border-dashed border-gray-300 rounded text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 mt-1">
+                                                        + Add Field
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
+
                         <details className="bg-white rounded-lg shadow mb-6">
                             <summary className="p-4 cursor-pointer font-bold text-lg flex items-center justify-between"><span><span className="text-red-600">CURRENT</span> Flat Structure ({allColumns.length} Columns)</span><span className="text-sm font-normal text-gray-500">Click to expand</span></summary>
                             <div className="p-4 border-t">
@@ -338,11 +524,13 @@
                             </div>
                         </details>
                     </div>
+
+                    {/* Field Mapping Modal (view mode) */}
                     {showFieldMappingModal && selectedNewField && (
                         <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
                             <div className="bg-white rounded-lg shadow-xl p-6 w-[700px] max-w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
                                 <div className="flex justify-between items-start mb-4">
-                                    <div><h3 className="text-lg font-bold">Field Mapping</h3><p className="text-sm text-gray-500 mt-1"><span className="font-mono bg-blue-100 px-2 py-1 rounded">{selectedNewField.name}</span> in <span className="font-semibold">{NEW_SCHEMA[selectedNewTable]?.displayName}</span></p></div>
+                                    <div><h3 className="text-lg font-bold">Field Mapping</h3><p className="text-sm text-gray-500 mt-1"><span className="font-mono bg-blue-100 px-2 py-1 rounded">{selectedNewField.name}</span> in <span className="font-semibold">{schema[selectedNewTable]?.displayName}</span></p></div>
                                     <button onClick={() => { setShowFieldMappingModal(false); setHighlightedSourceColumns([]); }} className="text-gray-500 hover:text-gray-700"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
@@ -365,11 +553,13 @@
                             </div>
                         </div>
                     )}
+
+                    {/* Example Modal (view mode) */}
                     {showExampleModal && selectedNewField && (
                         <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
                             <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
                                 <div className="flex justify-between items-start mb-4">
-                                    <div><h3 className="text-lg font-bold">Field Example</h3><p className="text-sm text-gray-500 mt-1"><span className="font-mono bg-blue-100 px-2 py-1 rounded">{selectedNewField.name}</span> in <span className="font-semibold">{NEW_SCHEMA[selectedNewTable]?.displayName}</span></p></div>
+                                    <div><h3 className="text-lg font-bold">Field Example</h3><p className="text-sm text-gray-500 mt-1"><span className="font-mono bg-blue-100 px-2 py-1 rounded">{selectedNewField.name}</span> in <span className="font-semibold">{schema[selectedNewTable]?.displayName}</span></p></div>
                                     <button onClick={() => setShowExampleModal(false)} className="text-gray-500 hover:text-gray-700"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
                                 <div className="bg-gray-100 rounded-lg p-4 mb-4">
@@ -386,6 +576,146 @@
                                     </div>
                                 )}
                                 <div className="mt-4 pt-4 border-t flex justify-end"><button onClick={() => setShowExampleModal(false)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Edit Table Modal */}
+                    {showEditTableModal && editingTable && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-full mx-4">
+                                <h3 className="text-lg font-bold mb-4">Edit Table</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Table Name (snake_case)</label>
+                                        <input type="text" id="edit-table-name" defaultValue={schema[editingTable]?.name} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                                        <input type="text" id="edit-table-display" defaultValue={schema[editingTable]?.displayName} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Table Type</label>
+                                        <select id="edit-table-type" defaultValue={schema[editingTable]?.type} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                            {TABLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                        <input type="text" id="edit-table-desc" defaultValue={schema[editingTable]?.description} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                </div>
+                                <div className="mt-6 flex justify-end gap-3">
+                                    <button onClick={() => setShowEditTableModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                                    <button onClick={() => {
+                                        const name = document.getElementById('edit-table-name').value.trim();
+                                        const display = document.getElementById('edit-table-display').value.trim();
+                                        const type = document.getElementById('edit-table-type').value;
+                                        const desc = document.getElementById('edit-table-desc').value.trim();
+                                        if (name) {
+                                            updateTableName(editingTable, name, display, type, desc);
+                                            setShowEditTableModal(false);
+                                        }
+                                    }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Add Table Modal */}
+                    {showAddTableModal && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-full mx-4">
+                                <h3 className="text-lg font-bold mb-4">Add New Table</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Table Name (snake_case)</label>
+                                        <input type="text" id="add-table-name" placeholder="new_table" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                                        <input type="text" id="add-table-display" placeholder="New Table (Type)" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Table Type</label>
+                                        <select id="add-table-type" defaultValue="supporting" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                            {TABLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                        <input type="text" id="add-table-desc" placeholder="Description of the table" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                </div>
+                                <div className="mt-6 flex justify-end gap-3">
+                                    <button onClick={() => setShowAddTableModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                                    <button onClick={() => {
+                                        const name = document.getElementById('add-table-name').value.trim();
+                                        const display = document.getElementById('add-table-display').value.trim();
+                                        const type = document.getElementById('add-table-type').value;
+                                        const desc = document.getElementById('add-table-desc').value.trim();
+                                        if (name && !schema[name]) {
+                                            addTable(name, display || name, type, desc);
+                                            setShowAddTableModal(false);
+                                        } else if (schema[name]) {
+                                            alert('Table name already exists');
+                                        }
+                                    }} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Table</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Edit Field Modal */}
+                    {showEditFieldModal && editingField && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-full mx-4">
+                                <h3 className="text-lg font-bold mb-4">Edit Field</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Field Name</label>
+                                        <input type="text" id="edit-field-name" defaultValue={editingField.name} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Data Type</label>
+                                        <input type="text" id="edit-field-type" defaultValue={editingField.type} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                </div>
+                                <div className="mt-6 flex justify-end gap-3">
+                                    <button onClick={() => setShowEditFieldModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                                    <button onClick={() => {
+                                        const name = document.getElementById('edit-field-name').value.trim();
+                                        const type = document.getElementById('edit-field-type').value.trim();
+                                        if (name && type) {
+                                            updateField(editingTable, editingFieldIndex, {...editingField, name, type});
+                                            setShowEditFieldModal(false);
+                                        }
+                                    }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Move Field Modal */}
+                    {showMoveFieldModal && editingField && (
+                        <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-xl p-6 w-[400px] max-w-full mx-4">
+                                <h3 className="text-lg font-bold mb-4">Move Field to Table</h3>
+                                <p className="text-sm text-gray-600 mb-4">Moving: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{editingField.name}</span></p>
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                    {tableOrder.filter(t => t !== editingTable).map(t => (
+                                        <button key={t} onClick={() => {
+                                            moveFieldToTable(editingTable, editingFieldIndex, t);
+                                            setShowMoveFieldModal(false);
+                                        }} className="w-full text-left p-3 rounded border hover:bg-blue-50 hover:border-blue-300">
+                                            <span className="font-medium">{schema[t]?.name}</span>
+                                            <span className={`text-xs ml-2 px-2 py-0.5 rounded ${getTypeBadgeColor(schema[t]?.type)}`}>{schema[t]?.type}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex justify-end">
+                                    <button onClick={() => setShowMoveFieldModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+                                </div>
                             </div>
                         </div>
                     )}
